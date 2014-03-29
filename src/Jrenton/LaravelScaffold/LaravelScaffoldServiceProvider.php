@@ -2,7 +2,7 @@
 
 use Illuminate\Support\ServiceProvider;
 
-class LaravelScaffold\ServiceProvider extends ServiceProvider {
+class LaravelScaffoldServiceProvider extends ServiceProvider {
 
 	/**
 	 * Indicates if loading of the provider is deferred.
