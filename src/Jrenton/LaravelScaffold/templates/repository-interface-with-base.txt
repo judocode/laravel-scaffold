@@ -1,0 +1,6 @@
+<?php [namespace]
+
+interface [repositoryInterface] extends [baseRepositoryInterface]
+{
+
+}

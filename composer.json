@@ -1,0 +1,26 @@
+{
+    "name": "jrenton/laravel-scaffold",
+    "description": "Automatically generates files for laravel project",
+    "keywords": ["laravel", "package", "scaffold", "command"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Justus Renton"
+        }
+    ],
+    "require": {
+        "php": ">=5.3.0",
+        "fzaninotto/faker": "v1.3.0"
+    },
+    "require-dev": {
+        "illuminate/support": "~4",
+        "illuminate/console": "~4",
+        "illuminate/filesystem": "~4"
+    },
+    "autoload": {
+        "psr-0": {
+            "Jrenton\\LaravelScaffold": "src/"
+        }
+    },
+    "minimum-stability": "dev"
+}
