@@ -24,7 +24,18 @@ That's it! You're all set to go. Run the `artisan` command from the Terminal to 
 
 ## New features
 
-###Load models and properties from a file!!
+###Keep a running list of your model definitions
+
+There is now a `scaffold:update` command and it is very cool! In your config file, you will have an option
+to specify a "modelDefinitions" file, and in this you will place all of your model definitions. See below
+for an example.
+
+When you update this file and run `php artisan scaffold:update` it will check to see what
+has changed and update your models/migrations automatically! Currently, there is no support for what you
+remove from this file, but it will come soon.
+
+
+###Load models and properties from a file
 
 You can now load as many models as you want from one file! Just run the command `php artisan scaffold:file "path/to/file.txt"` where `file.txt` is of the format:
 
