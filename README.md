@@ -62,13 +62,12 @@ This now comes with a configuration file. Configure all file directories, class 
 
 To include the config file within your config folder!
 
-## Usage
+## Commands
 
-Run `php artisan scaffold` and the guided setup will help you with the rest!
-
-### Video overview of command
-
-Reading is boring... check out this overview: https://www.youtube.com/watch?v=6ESSjdUSNMw
+`scaffold` will prompt you for a layout file and models
+`scaffold:model` will prompt you for models
+`scaffold:file "filename"` is how you can add multiple models from one file
+`scaffold:update` searches for changes in the model definitions file (defined in your config file), and updates your models/migrations accordingly.
 
 ### Accepted arguments at the add model prompt
 
@@ -99,6 +98,12 @@ Have a lot of properties that are "strings" or "integers" etc? No problem, just 
 `Book belongsTo Author string( title content description publisher ) published:datetime`
 
 If you are using the above syntax, please strictly adhere to it (for now).
+
+### Video overview of command
+
+Reading is boring... check out this overview: https://www.youtube.com/watch?v=6ESSjdUSNMw
+
+This video is a bit out of date now, but the idea is still the same.
 
 ## Additional comments
 
