@@ -7,7 +7,7 @@ class ScaffoldModelCommand extends Command
 {
     protected $name = 'scaffold:model';
 
-    protected $description = "Makes table, controller, model, views, seeds, and repository";
+    protected $description = "Makes table, controller, model, views, seeds, and repository for model";
 
     public function __construct()
     {

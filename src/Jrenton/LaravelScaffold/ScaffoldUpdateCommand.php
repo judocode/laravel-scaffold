@@ -7,7 +7,7 @@ class ScaffoldUpdateCommand extends Command
 {
     protected $name = 'scaffold:update';
 
-    protected $description = "Makes layout, js/css, table, controller, model, views, seeds, and repository";
+    protected $description = "Update model and database schema based on changes to models file";
 
     public function __construct()
     {
@@ -18,9 +18,11 @@ class ScaffoldUpdateCommand extends Command
     {
         $scaffold = new Scaffold($this);
 
+        $this->info('Updating...');
+
         $scaffold->update();
 
-        $this->info('Please wait a few moments...');
+        $this->info('Finishing...');
 
         $this->call('clear-compiled');
 

@@ -6,6 +6,7 @@ class Model
     private $originalName;
     private $namespace;
     private $tableName;
+    public $exists = false;
 
     public function __construct($modelName, $namespace = "")
     {

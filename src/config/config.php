@@ -4,6 +4,19 @@ return array(
 
     /*
 	|--------------------------------------------------------------------------
+	| Model definitions file location
+	|--------------------------------------------------------------------------
+	|
+	| This is the location where all of your models definitions are located.
+    |   Running "php artisan scaffold:update" will update any models you have
+    |   changed.
+	|
+	*/
+
+    'modelDefinitionsFile' => 'app/models.txt',
+
+    /*
+	|--------------------------------------------------------------------------
 	| Repository Pattern
 	|--------------------------------------------------------------------------
 	|

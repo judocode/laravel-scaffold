@@ -46,6 +46,8 @@ class Scaffold
 
     private $templatePathWithControllerType;
     private $namespaceGlobal;
+    private $columnAdded = false;
+    private $tablesAdded = array();
 
     public function __construct($command)
     {
@@ -83,6 +85,8 @@ class Scaffold
 
         $configSettings['useBaseRepository'] = \Config::get("$package::baseRepository");
 
+        $configSettings['modelDefinitionsFile'] = \Config::get("$package::modelDefinitionsFile");
+
         return $configSettings;
     }
 
@@ -108,9 +112,11 @@ class Scaffold
 
             $this->command->info("Model ".$this->model->upper(). " and all associated files created successfully!");
 
-            $modelAndFields = $this->command->ask('Add model with fields or "q" to quit: ');
+            $this->addToModelDefinitions($modelAndProperties);
 
-            $moreTables = trim($modelAndFields) == "q" ? false : true;
+            $modelAndProperties = $this->command->ask('Add model with fields or "q" to quit: ');
+
+            $moreTables = trim($modelAndProperties) == "q" ? false : true;
         }
     }
 
@@ -162,6 +168,44 @@ class Scaffold
         $this->copyTemplateFiles();
     }
 
+    public function update()
+    {
+        $this->fileCreator->fromFile = true;
+        $this->fromFile = true;
+        $this->assetDownloader->fromFile = true;
+
+        $this->setupLayoutFiles();
+
+        //$inputFile = file($this->configSettings['modelDefinitionsFile']);
+
+        $differences = $this->differences($this->configSettings['modelDefinitionsFile'] , $this->getModelCacheFile());
+
+        foreach( $differences as $line_num => $modelAndProperties ) {
+            $modelAndProperties = trim($modelAndProperties);
+            if(!empty($modelAndProperties)) {
+                if(preg_match("/^resource =/", $modelAndProperties)) {
+                    $this->isResource = trim(substr($modelAndProperties, strpos($modelAndProperties, "=")+1));
+                    continue;
+                }
+
+                if(preg_match("/^namespace =/", $modelAndProperties)) {
+                    $this->namespaceGlobal = true;
+                    $this->namespace = trim(substr($modelAndProperties, strpos($modelAndProperties, "=")+1));
+                    $this->fileCreator->namespace = $this->namespace;
+                    continue;
+                }
+
+                $this->saveModelAndProperties($modelAndProperties);
+
+                $this->createFiles();
+
+                sleep(1);
+            }
+        }
+
+        copy($this->configSettings['modelDefinitionsFile'], $this->getModelCacheFile());
+    }
+
     private function saveModelAndProperties($modelAndProperties)
     {
         $modelNameCollision = false;
@@ -204,6 +248,21 @@ class Scaffold
         }
     }
 
+    private function addToModelDefinitions($modelAndProperties)
+    {
+        \File::append($this->getModelCacheFile(), $modelAndProperties."\n");
+    }
+
+    private function getModelCacheFile()
+    {
+        $file = $this->configSettings['modelDefinitionsFile'];
+        $modelFilename = substr(strrchr($this->configSettings['modelDefinitionsFile'], "/"), 1);
+        $ext = substr($modelFilename, strrpos($modelFilename, "."), strlen($modelFilename)-strrpos($modelFilename, "."));
+        $name = substr($modelFilename, 0, strrpos($modelFilename, "."));
+        $modelDefinitionsFile = substr($file, 0, strrpos($file, "/")+1) . "." . $name ."-cache". $ext;
+        return $modelDefinitionsFile;
+    }
+
     private function createFiles()
     {
         $this->createModel();
@@ -214,24 +273,26 @@ class Scaffold
 
         $this->createMigrations();
 
-        $this->createSeeds();
+        if(!$this->model->exists)
+            $this->createSeeds();
 
         $this->runMigrations();
 
-        if($this->configSettings['useRepository']) {
-            $this->createRepository();
-            $this->createRepositoryInterface();
-            $this->putRepositoryFolderInStartFiles();
+        if(!$this->model->exists) {
+            if($this->configSettings['useRepository']) {
+                $this->createRepository();
+                $this->createRepositoryInterface();
+                $this->putRepositoryFolderInStartFiles();
+            }
+
+            $this->createController();
+
+            $this->createViews();
+
+            $this->updateRoutes();
+
+            $this->createTests();
         }
-
-        $this->createController();
-
-
-        $this->createViews();
-
-        $this->updateRoutes();
-
-        $this->createTests();
     }
 
     private function getControllerType()
@@ -295,6 +356,7 @@ class Scaffold
         $this->fillForeignKeys = array();
         $this->timestamps = true;
         $this->softDeletes = false;
+        $this->columnAdded = false;
     }
 
     private function getModelsWithRelationships(&$values)
@@ -446,30 +508,101 @@ class Scaffold
     {
         $tableName = $this->model->getTableName();
 
-        $createTable = "create_" . $tableName . "_table";
+        $tableCreated = $this->isTableCreated($this->model->getTableName());
 
-        $migrationFile = \App::make('Illuminate\Database\Migrations\MigrationCreator')->create($createTable, $this->configSettings['pathTo']['migrations'], $tableName, true);
+        if($tableCreated) {
+            $migrationName = "edit_" . $tableName . "_table";
+        } else {
+            $migrationName = "create_" . $tableName . "_table";
+        }
 
-        $functionContents = $this->migrationUp();
-        $fileContents = $this->fileCreator->createFunction("up", $functionContents);
+        if ($handle = opendir($this->configSettings['pathTo']['migrations'])) {
+            while (false !== ($entry = readdir($handle))) {
+                if ($entry[0] != ".") {
+                    if(strpos($entry, $migrationName) !== false) {
+                        $index = strpos($entry, "_");
+                        $index = strpos($entry, "_", $index+1);
+                        $index = strpos($entry, "_", $index+1);
+                        $index = strpos($entry, "_", $index+1);
 
-        $functionContents = "\t\tSchema::dropIfExists('".$tableName."');\n";
-        $fileContents .= $this->fileCreator->createFunction("down", $functionContents);
+                        $migrationFilename = substr($entry, $index+1, strrpos($entry, ".")-($index+1));
+                        $halfMigration = substr($migrationFilename, 0, strrpos($migrationFilename, "_"));
+                        $lastSegment = substr(strrchr($migrationFilename, "_"), 1);
+                        if(is_numeric($lastSegment)) {
+                            $migrationName = $halfMigration . "_" . ($lastSegment+1);
+                        } else {
+                            $migrationName = $migrationFilename . "_2";
+                        }
+                    }
+                }
+            }
+            closedir($handle);
+        }
 
-        $this->fileCreator->createMigrationClass($migrationFile, $fileContents, $this->model->upperPlural());
+        $functionContents = $this->migrationUp($tableCreated);
+
+        if($this->columnAdded) {
+            $migrationFile = $this->configSettings['pathTo']['migrations'] . date("Y_m_d_His") . "_" . $migrationName . ".php";
+
+            $classNameArr = explode("_", $migrationName);
+            $className = "";
+            foreach($classNameArr as $class) {
+                $className .= ucfirst($class);
+            }
+
+            $fileContents = $this->fileCreator->createFunction("up", $functionContents);
+            if(!$tableCreated) {
+                $functionContents = "\t\tSchema::dropIfExists('".$tableName."');\n";
+            } else {
+                $functionContents = "\t\tSchema::table('".$tableName."', function(\$table) {\n";
+                $functionContents .="\t\t\t\$table->dropColumn(";
+                foreach ($this->columnsAdded as $column) {
+                    $functionContents .= "'$column',";
+                }
+                $functionContents = rtrim($functionContents, ",");
+                $functionContents .= ");\n\t\t});\n";
+            }
+
+            $fileContents .= $this->fileCreator->createFunction("down", $functionContents);
+
+            $this->fileCreator->createMigrationClass($migrationFile, $fileContents, $className);
+        }
     }
 
-    protected function migrationUp()
+    /**
+     * @param $content
+     * @return string
+     */
+    protected function addSoftDeletes()
     {
-        $content = "\t\tSchema::create('".$this->model->getTableName()."', function(Blueprint \$table) {\n";
-        $content .= "\t\t\t" . $this->setColumn('increments', 'id') . ";\n";
-        $content .= $this->addColumns();
+        $content = "";
 
-        if($this->timestamps)
-            $content .= "\t\t\t" . $this->setColumn('timestamps', null) . ";\n";
+        if ($this->softDeletes) {
+            if (!$this->tableHasColumn($this->model->getTableName(), "deleted_at")) {
+                $this->columnAdded = true;
+                array_push($this->columnsAdded, "deleted_at");
+                $content = "\t\t\t" . $this->setColumn('softDeletes', null) . ";\n";
+            }
+        }
+        return $content;
+    }
 
-        if($this->softDeletes)
-            $content .= "\t\t\t" . $this->setColumn('softDeletes', null) . ";\n";
+    private $columnsAdded = array();
+
+    protected function migrationUp($tableCreated = false)
+    {
+        $type = $tableCreated ? "table" : "create";
+
+        $content = "\t\tSchema::$type('".$this->model->getTableName()."', function(Blueprint \$table) {\n";
+
+        if(!$tableCreated)
+            $content .= "\t\t\t" . $this->setColumn('increments', 'id') . ";\n";
+
+        $content .= $this->addColumns($this->model->getTableName());
+
+        $content .= $this->addTimestamps();
+
+        $content .= $this->addSoftDeletes();
 
         $content .= $this->addForeignKeys();
         $content .= "\t\t});\n";
@@ -483,6 +616,8 @@ class Scaffold
                 $tableName = $this->getPivotTableName($tableOne, $tableTwo);
 
                 if(!$this->isTableCreated($tableName)) {
+                    $this->columnAdded = true;
+                    array_push($this->tablesAdded, $tableName);
                     $content .= "\t\tSchema::create('".$tableName."', function(Blueprint \$table) {\n";
                     $content .= "\t\t\t\$table->integer('".$tableOne."_id')->unsigned();\n";
                     $content .= "\t\t\t\$table->integer('".$tableTwo."_id')->unsigned();\n";
@@ -490,13 +625,18 @@ class Scaffold
                 }
             } else if($relation->getType() == "hasOne" || $relation->getType() == "hasMany") {
                 if($this->tableHasColumn($relation->model->getTableName() ,$this->model->lower()."_id")) {
-                    $content .= "\t\tSchema::table('".$relation->model->getTableName()."', function(Blueprint \$table) {\n";
-                    $content .= "\t\t\t\$table->foreign('". $this->model->tableNameLower()."_id')->references('id')->on('".$this->model->getTableName()."');\n";
-                    $content .= "\t\t});\n";
+                    if(!$tableCreated) {
+                        $content .= "\t\tSchema::table('".$relation->model->getTableName()."', function(Blueprint \$table) {\n";
+                        $content .= "\t\t\t\$table->foreign('". $this->model->tableNameLower()."_id')->references('id')->on('".$this->model->getTableName()."');\n";
+                        $content .= "\t\t});\n";
+                    }
                 } else if($this->isTableCreated($relation->model->getTableName())) {
+                    $this->columnAdded = true;
+                    $column = $this->model->tableNameLower()."_id";
+                    array_push($this->columnsAdded, $column);
                     $content .= "\t\tSchema::table('".$relation->model->getTableName()."', function(Blueprint \$table) {\n";
-                    $content .= "\t\t\t\$table->integer('". $this->model->tableNameLower()."_id')->unsigned();\n";
-                    $content .= "\t\t\t\$table->foreign('". $this->model->tableNameLower()."_id')->references('id')->on('".$this->model->getTableName()."');\n";
+                    $content .= "\t\t\t\$table->integer('". $column."')->unsigned();\n";
+                    $content .= "\t\t\t\$table->foreign('". $column."')->references('id')->on('".$this->model->getTableName()."');\n";
                     $content .= "\t\t});\n";
                 }
             }
@@ -574,11 +714,15 @@ class Scaffold
         foreach($this->relationship as $relation) {
             if($relation->getType() == "belongsTo") {
                 $foreignKey = $relation->model->tableNameLower() . "_id";
-                $fields .= "\t\t\t" .$this->setColumn('integer', $foreignKey);
-                $fields .= $this->addColumnOption('unsigned') . ";\n";
-                if($this->isTableCreated($relation->model->getTableName())) {
-                    $fields .= "\t\t\t\$table->foreign('". $foreignKey."')->references('id')->on('".$relation->model->getTableName()."');\n";
-                    array_push($this->fillForeignKeys, $foreignKey);
+                if(!$this->tableHasColumn($this->model->getTableName(), $foreignKey)) {
+                    $this->columnAdded = true;
+                    array_push($this->columnsAdded, $foreignKey);
+                    $fields .= "\t\t\t" .$this->setColumn('integer', $foreignKey);
+                    $fields .= $this->addColumnOption('unsigned') . ";\n";
+                    if($this->isTableCreated($relation->model->getTableName())) {
+                        $fields .= "\t\t\t\$table->foreign('". $foreignKey."')->references('id')->on('".$relation->model->getTableName()."');\n";
+                        array_push($this->fillForeignKeys, $foreignKey);
+                    }
                 }
             }
         }
@@ -602,28 +746,27 @@ class Scaffold
         return "->{$option}()";
     }
 
-    protected function addColumns()
+    protected function addColumns($tableName = "")
     {
         $content = '';
 
-        if(!empty($this->propertiesArr))
-        {
-            // Build up the schema
-            foreach( $this->propertiesArr as $field => $type ) {
+        foreach( $this->propertiesArr as $field => $type ) {
 
+            if(!empty($tableName) && !$this->tableHasColumn($tableName, $field)) {
+                $this->columnAdded = true;
                 $rule = "\t\t\t";
 
                 // Primary key check
                 if ( $field === 'id' and $type === 'integer' )
-                {
                     $rule .= $this->increment();
-                } else {
+                else {
                     $rule .= $this->setColumn($this->validTypes[$type], $field);
 
-                    if ( !empty($setting) ) {
+                    if ( !empty($setting) )
                         $rule .= $this->addColumnOption($setting);
-                    }
                 }
+
+                array_push($this->columnsAdded, $field);
 
                 $content .= $rule . ";\n";
             }
@@ -659,6 +802,13 @@ class Scaffold
     private function createModel()
     {
         $fileName = $this->configSettings['pathTo']['models'] . $this->nameOf("modelName") . ".php";
+
+        if(\File::exists($fileName)) {
+            $this->updateModel($fileName);
+            $this->model->exists = true;
+            return;
+        }
+
         $fileContents = "protected \$table = '". $this->model->getTableName() ."';\n";
 
         if(!$this->timestamps)
@@ -676,47 +826,7 @@ class Scaffold
 
         $fileContents .= "\tprotected \$fillable = array(".$properties.");\n";
 
-        foreach ($this->relationship as $relation) {
-            $relatedModel = $relation->model;
-
-            $functionContent = "\t\treturn \$this->" . $relation->getType() . "('".$relatedModel->nameWithNamespace()."');\n";
-            $fileContents .= $this->fileCreator->createFunction($relation->getName(), $functionContent);
-
-            $relatedModelFile = $this->configSettings['pathTo']['models'].$relatedModel->upper().'.php';
-            $continue = true;
-
-            if(!\File::exists($relatedModelFile)) {
-                if($this->fromFile) {
-                    $continue = false;
-                } else {
-                    $continue = $this->command->confirm("Model ". $relatedModel->upper() . " doesn't exist yet. Would you like to create it now [y/n]? ", true);
-                    if($continue) {
-                        $this->fileCreator->createClass($relatedModelFile, "", array('name' => "\\Eloquent"));
-                    }
-                }
-            }
-
-            if($continue) {
-                $content = \File::get($relatedModelFile);
-                if (preg_match("/function ".$this->model->lower()."/", $content) !== 1 && preg_match("/function ".$this->model->plural()."/", $content) !== 1) {
-                    $index = 0;
-                    $reverseRelations = $relation->reverseRelations();
-
-                    if(count($reverseRelations) > 1) {
-                        $index = $this->command->ask($relatedModel->upper() . " (0=".$reverseRelations[0]. " OR 1=".$reverseRelations[1] .") ". $this->model->upper() ."? ");
-                    }
-
-                    $reverseRelationType = $reverseRelations[$index];
-                    $reverseRelationName = $relation->getReverseName($this->model, $reverseRelationType);
-
-                    $content = substr($content, 0, strrpos($content, "}"));
-                    $functionContent = "\t\treturn \$this->" . $reverseRelationType . "('".$this->model->nameWithNamespace()."');\n";
-                    $content .= $this->fileCreator->createFunction($reverseRelationName, $functionContent) . "}\n";
-
-                    \File::put($relatedModelFile, $content);
-                }
-            }
-        }
+        $fileContents = $this->addRelationships($fileContents);
 
         $template = $this->configSettings['useRepository'] ? "model.txt" : "model-no-repo.txt";
 
@@ -725,13 +835,25 @@ class Scaffold
         $this->updateLayoutFile();
     }
 
+    private function updateModel($fileName)
+    {
+        $fileContents = \File::get($fileName);
+
+        $fileContents = $this->addRelationships($fileContents, false) . "\n}";
+
+        \File::put($fileName, $fileContents);
+    }
+
     private function updateLayoutFile()
     {
-        $layout = \File::get($this->configSettings['pathTo']['layout']);
+        $layoutFile = $this->configSettings['pathTo']['layout'];
+        if(\File::exists($layoutFile)) {
+            $layout = \File::get($layoutFile);
 
-        $layout = str_replace("<!--[linkToModels]-->", "<a href=\"{{ url('".$this->nameOf("viewFolder")."') }}\" class=\"list-group-item\">".$this->model->upper()."</a>\n<!--[linkToModels]-->", $layout);
+            $layout = str_replace("<!--[linkToModels]-->", "<a href=\"{{ url('".$this->nameOf("viewFolder")."') }}\" class=\"list-group-item\">".$this->model->upper()."</a>\n<!--[linkToModels]-->", $layout);
 
-        \File::put($this->configSettings['pathTo']['layout'], $layout);
+            \File::put($layoutFile, $layout);
+        }
     }
 
     private function createSeeds()
@@ -964,7 +1086,6 @@ class Scaffold
             } catch(\Illuminate\Filesystem\FileNotFoundException $e) {
                 $this->command->error("Template file ".$pathToViews . $view.".txt does not exist! You need to create it to generate that file!");
             }
-
         }
     }
 
@@ -974,7 +1095,7 @@ class Scaffold
             $fileContents = \File::get($template);
         } catch(\Illuminate\Filesystem\FileNotFoundException $e) {
             $shortTemplate = substr($template, strpos($template, $this->configSettings["pathTo"]["templates"]) + strlen($this->configSettings["pathTo"]["templates"]),strlen($template)-strlen($this->configSettings["pathTo"]["templates"]));
-            $this->fileCreator->copyFile("vendor/ourlearn/laravel-starter/src/Ourlearn/LaravelStarter/templates/".$shortTemplate, $template);
+            $this->fileCreator->copyFile("vendor/jrenton/laravel-scaffold/src/Jrenton/LaravelScaffold/templates/".$shortTemplate, $template);
             $fileContents = \File::get($template);
         }
         $fileContents = $this->replaceNames($fileContents);
@@ -1037,5 +1158,132 @@ class Scaffold
         }
 
         return $fileContents;
+    }
+
+    /**
+     * @param $fileContents
+     * @return string
+     */
+    private function addRelationships($fileContents, $newModel = true)
+    {
+        $count = 0;
+        foreach ($this->relationship as $relation) {
+            $relatedModel = $relation->model;
+
+            if(strpos($fileContents, $relation->getName()) === false && !$newModel) {
+                if($count == 0)
+                    $fileContents = substr($fileContents, 0, strrpos($fileContents, "}"));
+
+                $count++;
+            }
+
+            $functionContent = "\t\treturn \$this->" . $relation->getType() . "('" . $relatedModel->nameWithNamespace() . "');\n";
+            $fileContents .= $this->fileCreator->createFunction($relation->getName(), $functionContent);
+
+            $relatedModelFile = $this->configSettings['pathTo']['models'] . $relatedModel->upper() . '.php';
+            $continue = true;
+
+            if (!\File::exists($relatedModelFile)) {
+                if ($this->fromFile) {
+                    $continue = false;
+                } else {
+                    $continue = $this->command->confirm("Model " . $relatedModel->upper() . " doesn't exist yet. Would you like to create it now [y/n]? ", true);
+                    if ($continue) {
+                        $this->fileCreator->createClass($relatedModelFile, "", array('name' => "\\Eloquent"));
+                    }
+                }
+            }
+
+            if ($continue) {
+                $content = \File::get($relatedModelFile);
+                if (preg_match("/function " . $this->model->lower() . "/", $content) !== 1 && preg_match("/function " . $this->model->plural() . "/", $content) !== 1) {
+                    $index = 0;
+                    $reverseRelations = $relation->reverseRelations();
+
+                    if (count($reverseRelations) > 1) {
+                        $index = $this->command->ask($relatedModel->upper() . " (0=" . $reverseRelations[0] . " OR 1=" . $reverseRelations[1] . ") " . $this->model->upper() . "? ");
+                    }
+
+                    $reverseRelationType = $reverseRelations[$index];
+                    $reverseRelationName = $relation->getReverseName($this->model, $reverseRelationType);
+
+                    $content = substr($content, 0, strrpos($content, "}"));
+                    $functionContent = "\t\treturn \$this->" . $reverseRelationType . "('" . $this->model->nameWithNamespace() . "');\n";
+                    $content .= $this->fileCreator->createFunction($reverseRelationName, $functionContent) . "}\n";
+
+                    \File::put($relatedModelFile, $content);
+                }
+            }
+        }
+        return $fileContents;
+    }
+
+    /**
+     * @param $content
+     * @return string
+     */
+    private function addTimestamps()
+    {
+        $content = "";
+        if ($this->timestamps) {
+            if (!$this->tableHasColumn($this->model->getTableName(), "created_at")) {
+                $this->columnAdded = true;
+                $content .= "\t\t\t" . $this->setColumn("timestamp", "created_at") . ";\n";
+            }
+            if (!$this->tableHasColumn($this->model->getTableName(), "updated_at")) {
+                $this->columnAdded = true;
+                $content .= "\t\t\t" . $this->setColumn("timestamp", "updated_at") . ";\n";
+            }
+        }
+        return $content;
+    }
+
+    private function differences($fileOne, $fileTwo)
+    {
+        $inputFile = file($fileOne);
+
+        $fileOneContents = array();
+
+        foreach( $inputFile as $line_num => $modelAndProperties ) {
+            $lineContents = preg_split('/\s+/', $modelAndProperties, -1, PREG_SPLIT_NO_EMPTY);
+            array_push($fileOneContents, $lineContents);
+        }
+
+        $inputFile = file($fileTwo);
+
+        $fileTwoContents = array();
+
+        foreach( $inputFile as $line_num => $modelAndProperties ) {
+            $lineContents = preg_split('/\s+/', $modelAndProperties, -1, PREG_SPLIT_NO_EMPTY);
+            array_push($fileTwoContents, $lineContents);
+        }
+
+        $max = count($fileOneContents);
+        if(count($fileTwoContents) > $max)
+            $max = count($fileTwoContents);
+
+        $changes = array();
+
+        for($i = 0; $i < $max; $i++) {
+            if(array_key_exists($i, $fileOneContents)) {
+                if(array_key_exists($i, $fileTwoContents)) {
+                    $diff = array_diff($fileOneContents[$i], $fileTwoContents[$i]);
+                    //$diff2 = array_diff($fileOneContents[$i], $fileTwoContents[$i]);
+                    //$totalDiff = array_merge($diff, $diff2);
+
+                    if(count($diff) > 0) {
+                        array_unshift($diff, $fileTwoContents[$i][0]);
+                        $modelStr = implode(" ", $diff);
+                        array_push($changes, $modelStr);
+                    }
+                } else {
+                    array_push($changes, implode(" ", $fileOneContents[$i]));
+                }
+            } else {
+                array_push($changes, implode(" ", $fileTwoContents[$i]));
+            }
+        }
+
+        return $changes;
     }
 }
