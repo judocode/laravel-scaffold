@@ -16,9 +16,9 @@ class ScaffoldUpdateCommand extends Command
 
     public function fire()
     {
-        $scaffold = new Scaffold($this);
-
         $this->info('Updating...');
+
+        $scaffold = new Scaffold($this);
 
         $scaffold->update();
 
