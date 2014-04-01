@@ -131,6 +131,10 @@ Then run `laravel project-name` and watch as your application is fully built and
 
 Watch a [demonstration](http://youtu.be/e7otZWQSqrY) on youtube
 
+## Features to be added
+
+- Add command `scaffold:rollback` to remove any files that were created during the last scaffold update.
+
 ## Future ideas
 
 - Automatically create js file based on js framework that is specified.
