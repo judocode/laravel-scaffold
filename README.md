@@ -31,9 +31,10 @@ to specify a "modelDefinitions" file, and in this you will place all of your mod
 for an example.
 
 When you update this file and run `php artisan scaffold:update` it will check to see what
-has changed and update your models/migrations automatically! Currently, there is no support for what you
-remove from this file, but it will come soon.
-
+has changed and update your models/migrations automatically! It will keep a "cache" file in the
+same directory as your models file to track the changes, so DO NOT EDIT IT! This allows the command to
+know if anything has been removed. Fields can be removed and a migration will be automatically generated
+to drop the respective fields. Support to remove relationships is coming soon.
 
 ###Load models and properties from a file
 
