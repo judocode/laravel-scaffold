@@ -14,6 +14,9 @@ class Model extends BaseModel
      */
     private $propertiesStr = "";
 
+    private $propertiesToRemove = array();
+    private $propertiesToChange = array();
+
     /**
      * @var string
      */
@@ -24,6 +27,8 @@ class Model extends BaseModel
      */
     private $namespaceGlobal;
 
+    private $oldModelFile;
+
     /**
      * @var bool
      */
@@ -32,9 +37,10 @@ class Model extends BaseModel
     /**
      * @param Command $command
      */
-    public function __construct(Command $command)
+    public function __construct(Command $command, $oldModelFile)
     {
         $this->command = $command;
+        $this->oldModelFile = $oldModelFile;
     }
 
     /**
@@ -68,6 +74,18 @@ class Model extends BaseModel
 
             $this->propertiesArr = $this->getPropertiesFromInput($this->inputProperties);
 
+            if(array_key_exists($this->getTableName(), $this->oldModelFile)) {
+                if(array_key_exists("properties", $this->oldModelFile[$this->getTableName()])) {
+                    foreach ($this->oldModelFile[$this->getTableName()]["properties"] as $property => $type) {
+                        if(!array_key_exists($property, $this->propertiesArr)) {
+                            $this->propertiesToRemove[] = $property;
+                        } else if($this->oldModelFile[$this->getTableName()]["properties"][$property] != $this->propertiesArr[$property]){
+                            $this->propertiesToChange[$property] = $this->propertiesArr[$property];
+                        }
+                    }
+                }
+            }
+
             if($this->propertiesArr === false)
                 return false;
 
@@ -75,6 +93,11 @@ class Model extends BaseModel
         }
 
         return true;
+    }
+
+    public function getPropertiesToRemove()
+    {
+        return $this->propertiesToRemove;
     }
 
     /**

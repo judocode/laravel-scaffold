@@ -105,18 +105,27 @@ class Migration
             foreach($classNameArr as $class) {
                 $className .= ucfirst($class);
             }
+            $removedProperties = $this->model->getPropertiesToRemove();
 
             $fileContents = $this->fileCreator->createFunction("up", $functionContents);
             if(!$tableCreated) {
                 $functionContents = "\t\tSchema::dropIfExists('".$tableName."');\n";
             } else {
-                $functionContents = "\t\tSchema::table('".$tableName."', function(\$table) {\n";
-                $functionContents .="\t\t\t\$table->dropColumn(";
-                foreach ($this->columnsAdded as $column) {
-                    $functionContents .= "'$column',";
+                $functionContents = "\t\tSchema::table('".$tableName."', function(Blueprint \$table) {\n";
+
+                if(!empty($this->columnsAdded)) {
+                    $functionContents .="\t\t\t\$table->dropColumn(";
+                    foreach ($this->columnsAdded as $column) {
+                        $functionContents .= "'$column',";
+                    }
+                    $functionContents = rtrim($functionContents, ",");
+                    $functionContents .= ");\n\t\t});\n";
+                } else if (!empty($removedProperties)) {
+                    foreach ($removedProperties as $property => $type) {
+                        $functionContents .= "\t\t\t\$table->$type('$property');\n\t\t});\n";
+                    }
                 }
-                $functionContents = rtrim($functionContents, ",");
-                $functionContents .= ");\n\t\t});\n";
+
             }
 
             $fileContents .= $this->fileCreator->createFunction("down", $functionContents);
@@ -167,6 +176,9 @@ class Migration
         $content .= $this->addSoftDeletes();
 
         $content .= $this->addForeignKeys();
+
+        $content .= $this->dropColumns();
+
         $content .= "\t\t});\n";
 
         foreach($this->model->getRelationships() as $relation) {
@@ -512,4 +524,14 @@ class Migration
         }
         return $content;
     }
-} 
+
+    private function dropColumns()
+    {
+        $content = "";
+        foreach ($this->model->getPropertiesToRemove() as $property => $type) {
+            $this->columnAdded = true;
+            $content .= "\t\t\t\$table->dropColumn('".$property."');\n";
+        }
+        return $content;
+    }
+}

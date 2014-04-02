@@ -21,28 +21,69 @@ class Scaffold
      */
     private $migration;
 
+    /**
+     * @var bool
+     */
     private $isResource;
 
+    /**
+     * @var string
+     */
     private $controllerType;
 
+    /**
+     * @var bool
+     */
     private $fromFile;
 
+    /**
+     * @var FileCreator
+     */
     private $fileCreator;
 
+    /**
+     * @var AssetDownloader
+     */
     private $assetDownloader;
 
+    /**
+     * @var array
+     */
     protected $configSettings;
 
+    /**
+     * @var \Illuminate\Console\Command
+     */
     protected $command;
 
+    /**
+     * @var
+     */
     private $templatePathWithControllerType;
 
+    /**
+     * @var bool
+     */
     private $columnAdded = false;
 
+    /**
+     * @var bool
+     */
     private $onlyMigration = false;
+
+    /**
+     * @var bool
+     */
     private $namespaceGlobal;
+
+    /**
+     * @var string
+     */
     private $namespace;
 
+    /**
+     * @var array
+     */
     private $lastTimeStamp = array();
 
     public function __construct(Command $command)
@@ -100,7 +141,7 @@ class Scaffold
 
         while( $moreTables ) {
 
-            $this->saveModelAndProperties($modelAndProperties);
+            $this->saveModelAndProperties($modelAndProperties, array());
 
             $this->isResource = $this->command->confirm('Do you want resource (y) or restful (n) controllers? ');
 
@@ -133,38 +174,7 @@ class Scaffold
 
         $inputFile = file($fileName);
 
-        foreach( $inputFile as $line_num => $modelAndProperties ) {
-            $modelAndProperties = trim($modelAndProperties);
-            if(!empty($modelAndProperties)) {
-                if(preg_match("/^resource =/", $modelAndProperties)) {
-                    $this->isResource = trim(substr($modelAndProperties, strpos($modelAndProperties, "=")+1));
-                    continue;
-                }
-
-                if(preg_match("/^namespace =/", $modelAndProperties)) {
-                    $this->namespaceGlobal = true;
-                    $this->namespace = trim(substr($modelAndProperties, strpos($modelAndProperties, "=")+1));
-                    $this->fileCreator->namespace = $this->namespace;
-                    continue;
-                }
-
-                $this->saveModelAndProperties($modelAndProperties);
-
-                $this->createFiles();
-            }
-        }
-    }
-
-    private function getLaravelClassNames()
-    {
-        $classNames = array();
-
-        $aliases = \Config::get('app.aliases');
-        foreach ($aliases as $alias => $facade) {
-            array_push($classNames, strtolower($alias));
-        }
-
-        return $classNames;
+        $this->addAllModelsFromFile($inputFile);
     }
 
     public function setupLayoutFiles()
@@ -184,8 +194,16 @@ class Scaffold
 
         $inputFile = file($this->configSettings['modelDefinitionsFile']);
 
-        if(\File::exists($this->getModelCacheFile())) {
+        $this->addAllModelsFromFile($inputFile);
+    }
 
+    public function addAllModelsFromFile($inputFile)
+    {
+        $oldModelFile = array();
+
+        if(\File::exists($this->getModelCacheFile())) {
+            $cachedFile = file($this->getModelCacheFile());
+            $oldModelFile = $this->readInputFile($cachedFile, false);
         }
 
         foreach( $inputFile as $line_num => $modelAndProperties ) {
@@ -203,7 +221,7 @@ class Scaffold
                     continue;
                 }
 
-                $this->saveModelAndProperties($modelAndProperties);
+                $this->saveModelAndProperties($modelAndProperties, $oldModelFile);
 
                 $this->createFiles();
             }
@@ -212,10 +230,56 @@ class Scaffold
         copy($this->configSettings['modelDefinitionsFile'], $this->getModelCacheFile());
     }
 
-    private function saveModelAndProperties($modelAndProperties)
+    public function readInputFile($inputFile, $createFiles = true)
+    {
+        $oldModelFile = array();
+
+        foreach( $inputFile as $line_num => $modelAndProperties ) {
+            $modelAndProperties = trim($modelAndProperties);
+            if(!empty($modelAndProperties)) {
+                if(preg_match("/^resource =/", $modelAndProperties)) {
+                    $this->isResource = trim(substr($modelAndProperties, strpos($modelAndProperties, "=")+1));
+                    continue;
+                }
+
+                if(preg_match("/^namespace =/", $modelAndProperties)) {
+                    $this->namespaceGlobal = true;
+                    $this->namespace = trim(substr($modelAndProperties, strpos($modelAndProperties, "=")+1));
+                    $this->fileCreator->namespace = $this->namespace;
+                    continue;
+                }
+
+                $this->saveModelAndProperties($modelAndProperties, array());
+
+                $oldModelFile[$this->model->getTableName()] = array();
+
+                $oldModelFile[$this->model->getTableName()]['relationships'] = $this->model->getRelationships();
+                $oldModelFile[$this->model->getTableName()]['properties'] = $this->model->getProperties();
+
+                if($createFiles)
+                    $this->createFiles();
+            }
+        }
+
+        return $oldModelFile;
+    }
+
+    private function getLaravelClassNames()
+    {
+        $classNames = array();
+
+        $aliases = \Config::get('app.aliases');
+        foreach ($aliases as $alias => $facade) {
+            array_push($classNames, strtolower($alias));
+        }
+
+        return $classNames;
+    }
+
+    private function saveModelAndProperties($modelAndProperties, $oldModelFile)
     {
         do {
-            $this->model = new Model($this->command);
+            $this->model = new Model($this->command, $oldModelFile);
 
             $this->model->generateModel($modelAndProperties);
 
@@ -240,13 +304,13 @@ class Scaffold
 
     private function addToModelDefinitions($modelAndProperties)
     {
-        \File::append($this->getModelCacheFile(), $modelAndProperties."\n");
+        \File::append($this->getModelCacheFile(), "\n" . $modelAndProperties);
     }
 
     private function getModelCacheFile()
     {
         $file = $this->configSettings['modelDefinitionsFile'];
-        $modelFilename = substr(strrchr($this->configSettings['modelDefinitionsFile'], "/"), 1);
+        $modelFilename = substr(strrchr($file, "/"), 1);
         $ext = substr($modelFilename, strrpos($modelFilename, "."), strlen($modelFilename)-strrpos($modelFilename, "."));
         $name = substr($modelFilename, 0, strrpos($modelFilename, "."));
         $modelDefinitionsFile = substr($file, 0, strrpos($file, "/")+1) . "." . $name ."-cache". $ext;
