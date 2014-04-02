@@ -1,16 +1,39 @@
 <?php namespace Jrenton\LaravelScaffold;
 
+use Illuminate\Console\Command;
+
 class FileCreator
 {
+    /**
+     * @var \Illuminate\Console\Command
+     */
     private $command;
+
+    /**
+     * @var bool
+     */
     public $fromFile;
+
+    /**
+     * @var string
+     */
     public $namespace;
 
-    public function __construct($command)
+    /**
+     * @param Command $command
+     */
+    public function __construct(Command $command)
     {
         $this->command = $command;
     }
 
+    /**
+     * @param string $name
+     * @param string $content
+     * @param string $args
+     * @param string $type
+     * @return string
+     */
     public function createFunction($name, $content, $args = "", $type = "public")
     {
         $fileContents = "\t$type function $name($args)\n";
@@ -21,16 +44,36 @@ class FileCreator
         return $fileContents;
     }
 
+    /**
+     * @param $path
+     * @param $content
+     */
     public function createInterface($path, $content)
     {
         $this->createClass($path, $content, array(), array(), array(), "interface");
     }
 
+    /**
+     * @param $path
+     * @param $content
+     * @param $name
+     */
     public function createMigrationClass($path, $content, $name)
     {
         $this->createClass($path, $content, array('name' => 'Migration'), array(), array('Illuminate\Database\Migrations\Migration', 'Illuminate\Database\Schema\Blueprint'), "class", $name, false, true);
     }
 
+    /**
+     * @param $path
+     * @param $content
+     * @param array $extends
+     * @param array $vars
+     * @param array $uses
+     * @param string $type
+     * @param string $customName
+     * @param bool $useNamespace
+     * @param bool $overwrite
+     */
     public function createClass($path, $content, array $extends = array(), $vars = array(), array $uses = array(), $type = "class", $customName = "", $useNamespace = true, $overwrite = false)
     {
         $usesOutput = "";
@@ -81,9 +124,11 @@ class FileCreator
         $this->createFile($path, $fileContents, $overwrite);
     }
 
-    /*
-    *   Checks if file exists, and then prompts to overwrite
-    */
+    /**
+     * @param string $fileName
+     * @param string $fileContents
+     * @param bool $overwrite
+     */
     public function createFile($fileName, $fileContents, $overwrite = false)
     {
         if(\File::exists($fileName) && !$overwrite) {
@@ -97,7 +142,7 @@ class FileCreator
     }
 
     /**
-     * @param $dir
+     * @param string $dir
      */
     public function createDirectory($dir)
     {
@@ -106,8 +151,8 @@ class FileCreator
     }
 
     /**
-     * @param $functions
-     * @param $fileContents
+     * @param array $functions
+     * @return string
      */
     public function createFunctions($functions)
     {
@@ -121,11 +166,19 @@ class FileCreator
         return $fileContents;
     }
 
+    /**
+     * @param $source
+     * @param $destination
+     */
     public function copyFile($source, $destination)
     {
         copy($source, $destination);
     }
 
+    /**
+     * @param $source
+     * @param $destination
+     */
     public function copyDirectory($source, $destination)
     {
         if (file_exists ( $destination ))
@@ -140,6 +193,9 @@ class FileCreator
             copy ( $source, $destination );
     }
 
+    /**
+     * @param $dir
+     */
     public function removeDirectory($dir)
     {
         if (is_dir($dir)) {
@@ -150,5 +206,4 @@ class FileCreator
         }
         else if (file_exists($dir)) unlink($dir);
     }
-
 }

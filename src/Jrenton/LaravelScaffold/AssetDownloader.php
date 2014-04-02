@@ -1,20 +1,50 @@
 <?php namespace Jrenton\LaravelScaffold;
 
+use Illuminate\Console\Command;
+
 class AssetDownloader
 {
+    /**
+     * @var \Illuminate\Console\Command
+     */
     private $command;
+
+    /**
+     * @var array
+     */
     private $configSettings;
+
+    /**
+     * @var FileCreator
+     */
     private $fileCreator;
+
+    /**
+     * @var bool
+     */
     public $fromFile;
+
+    /**
+     * @var string
+     */
     public $fileContents;
 
-    public function __construct($command, $configSettings, FileCreator $fileCreator)
+    /**
+     * @param Command $command
+     * @param array $configSettings
+     * @param FileCreator $fileCreator
+     */
+    public function __construct(Command $command, array $configSettings, FileCreator $fileCreator)
     {
         $this->command = $command;
         $this->configSettings = $configSettings;
         $this->fileCreator = $fileCreator;
     }
 
+    /**
+     * @param $assetName
+     * @param $downloadLocation
+     */
     public function downloadAsset($assetName, $downloadLocation)
     {
         $type = substr(strrchr($downloadLocation, "."), 1);
@@ -48,9 +78,6 @@ class AssetDownloader
         }
     }
 
-    /*
-    *   Generates a default layout
-    */
     public function generateLayoutFiles()
     {
         $makeLayout = $this->fromFile ? true : $this->command->confirm('Create default layout file [y/n]? (specify css/js files in config) ', true);
@@ -77,6 +104,8 @@ class AssetDownloader
                 $content = preg_replace("/Controller {/", "Controller {\n\tprotected \$layout = '$layoutName';", $content);
                 \File::put($this->configSettings['pathTo']['controllers'].'BaseController.php', $content);
             }
+
+            $overwrite = false;
 
             if(\File::exists($layoutPath))
                 $overwrite = $this->command->confirm('Layout file exists. Overwrite? [y/n]? ', true);
@@ -106,9 +135,6 @@ class AssetDownloader
         }
     }
 
-    /*
-    *	Download either bootstrap or foundation
-    */
     private function downloadCSSFramework()
     {
         if( $this->configSettings['downloads']['bootstrap'] )
@@ -173,7 +199,6 @@ class AssetDownloader
             $fileReplace .= "<!--[css]-->\n";
             $this->fileContents = str_replace("<!--[css]-->",  $fileReplace, $this->fileContents);
             $this->fileContents = str_replace("<!--[javascript]-->", "<script src=\"{{ url('bootstrap/js/bootstrap.min.js') }}\"></script>\n<!--[javascript]-->", $this->fileContents);
-            //$this->command->info("Bootstrap files loaded to public/bootstrap!");
         }
         else if($this->configSettings['downloads']['foundation'])
         {
@@ -219,8 +244,6 @@ class AssetDownloader
             $fileReplace = "\t<link href=\"{{ url ('css/foundation.min.css') }}\" rel=\"stylesheet\">\n<!--[css]-->";
             $this->fileContents = str_replace("<!--[css]-->",  $fileReplace, $this->fileContents);
             $this->fileContents = str_replace("<!--[javascript]-->", "<script src=\"{{ url ('/js/foundation.js') }}\"></script>\n<!--[javascript]-->", $this->fileContents);
-
-            //$this->command->info('Foundation successfully set up (v4.0.5)!');
         }
     }
-} 
+}

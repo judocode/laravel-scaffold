@@ -1,57 +1,51 @@
 <?php namespace Jrenton\LaravelScaffold;
 
+use Illuminate\Console\Command;
 use Faker\Factory;
+use Illuminate\Filesystem\FileNotFoundException;
 
 class Scaffold
 {
+    /**
+     * @var array
+     */
     private $laravelClasses = array();
-    private $propertiesArr = array();
-    private $propertiesStr = "";
+
+    /**
+     * @var Model
+     */
     private $model;
-    private $relationship = array();
-    private $namespace;
+
+    /**
+     * @var Migration
+     */
+    private $migration;
+
     private $isResource;
-    private $fieldNames;
+
     private $controllerType;
+
     private $fromFile;
+
     private $fileCreator;
+
     private $assetDownloader;
-    private $timestamps = true;
-    private $softDeletes = false;
-    private $lastTimeStamp = array();
 
     protected $configSettings;
+
     protected $command;
 
-    private $validTypes = array(
-        'biginteger'=>'bigInteger',
-        'binary'=>'binary',
-        'boolean'=>'boolean',
-        'date'=>'date',
-        'datetime'=>'dateTime',
-        'decimal'=>'decimal',
-        'double'=>'double',
-        'enum'=>'enum',
-        'float'=>'float',
-        'integer'=>'integer',
-        'longtext'=>'longText',
-        'mediumtext'=>'mediumText',
-        'smallinteger'=>'smallInteger',
-        'tinyinteger'=>'tinyInteger',
-        'string'=>'string',
-        'text'=>'text',
-        'time'=>'time',
-        'timestamp'=>'timestamp',
-        'morphs'=>'morphs',
-        'bigincrements'=>'bigIncrements');
-
     private $templatePathWithControllerType;
-    private $namespaceGlobal;
-    private $columnAdded = false;
-    private $tablesAdded = array();
-    private $onlyMigration = false;
 
-    public function __construct($command)
+    private $columnAdded = false;
+
+    private $onlyMigration = false;
+    private $namespaceGlobal;
+    private $namespace;
+
+    private $lastTimeStamp = array();
+
+    public function __construct(Command $command)
     {
         $this->configSettings = $this->getConfigSettings();
         $this->command = $command;
@@ -161,6 +155,18 @@ class Scaffold
         }
     }
 
+    private function getLaravelClassNames()
+    {
+        $classNames = array();
+
+        $aliases = \Config::get('app.aliases');
+        foreach ($aliases as $alias => $facade) {
+            array_push($classNames, strtolower($alias));
+        }
+
+        return $classNames;
+    }
+
     public function setupLayoutFiles()
     {
         $this->laravelClasses = $this->getLaravelClassNames();
@@ -178,9 +184,9 @@ class Scaffold
 
         $inputFile = file($this->configSettings['modelDefinitionsFile']);
 
-        //die(var_dump($inputFile));
+        if(\File::exists($this->getModelCacheFile())) {
 
-        //$differences = $this->differences($this->configSettings['modelDefinitionsFile'] , $this->getModelCacheFile());
+        }
 
         foreach( $inputFile as $line_num => $modelAndProperties ) {
             $modelAndProperties = trim($modelAndProperties);
@@ -208,41 +214,27 @@ class Scaffold
 
     private function saveModelAndProperties($modelAndProperties)
     {
-        $modelNameCollision = false;
-
-        $this->resetModels();
-
         do {
-            if($modelNameCollision) {
-                $modelAndProperties = $this->command->ask($this->model->upper() ." is already in the global namespace. Please namespace your class or provide a different name: ");
-                if(!$this->namespaceGlobal) {
-                    $this->fileCreator->namespace = "";
-                    $this->namespace = "";
-                }
-            }
+            $this->model = new Model($this->command);
 
-            $values = preg_split('/\s+/', $modelAndProperties);
-
-            $modelWithNamespace = array_shift($values);
+            $this->model->generateModel($modelAndProperties);
 
             if(!$this->namespaceGlobal) {
-                $this->namespace = $this->getNamespace($modelWithNamespace);
-                $this->fileCreator->namespace = $this->namespace;
+                $this->fileCreator->namespace = $this->model->getNamespace();
+                $this->namespace = $this->model->getNamespace();
             }
-
-            $this->model = $this->getModel($modelWithNamespace);
 
             $modelNameCollision = in_array($this->model->lower(), $this->laravelClasses);
 
         } while($modelNameCollision);
 
-        if( !empty($values) ) {
-            $this->getModelsWithRelationships($values);
+        $propertiesGenerated = $this->model->generateProperties();
 
-            $this->fieldNames = $values;
-
-            $this->propertiesArr = $this->getPropertiesFromInput($this->fieldNames);
-            $this->propertiesStr .= implode(",", array_keys($this->propertiesArr));
+        if(!$propertiesGenerated) {
+            if($this->fromFile)
+                exit;
+            else
+                $this->createModels();
         }
     }
 
@@ -265,7 +257,9 @@ class Scaffold
     {
         $this->createModel();
 
-        $this->createMigrations();
+        $this->migration = new Migration($this->configSettings['pathTo']['migrations'], $this->model, $this->fileCreator);
+
+        $this->migration->createMigrations($this->lastTimeStamp);
 
         $this->runMigrations();
 
@@ -293,6 +287,119 @@ class Scaffold
                 $this->createSeeds();
             }
         }
+    }
+
+    private function createModel()
+    {
+        $fileName = $this->configSettings['pathTo']['models'] . $this->nameOf("modelName") . ".php";
+
+        if(\File::exists($fileName)) {
+            $this->updateModel($fileName);
+            $this->model->exists = true;
+            return;
+        }
+
+        $fileContents = "protected \$table = '". $this->model->getTableName() ."';\n";
+
+        if(!$this->model->hasTimestamps())
+            $fileContents .= "\tpublic \$timestamps = false;\n";
+
+        if($this->model->hasSoftdeletes())
+            $fileContents .= "\tprotected \$softDelete = true;\n";
+
+        $properties = "";
+        foreach ($this->model->getProperties() as $property => $type) {
+            $properties .= "'$property',";
+        }
+
+        $properties = rtrim($properties, ",");
+
+        $fileContents .= "\tprotected \$fillable = array(".$properties.");\n";
+
+        $fileContents = $this->addRelationships($fileContents);
+
+        $template = $this->configSettings['useRepository'] ? "model.txt" : "model-no-repo.txt";
+
+        $this->makeFileFromTemplate($fileName, $this->configSettings['pathTo']['templates'].$template, $fileContents);
+
+        $this->updateLayoutFile();
+    }
+
+    private function updateModel($fileName)
+    {
+        $fileContents = \File::get($fileName);
+
+        $fileContents = $this->addRelationships($fileContents, false) . "\n}";
+
+        \File::put($fileName, $fileContents);
+    }
+
+    private function updateLayoutFile()
+    {
+        $layoutFile = $this->configSettings['pathTo']['layout'];
+        if(\File::exists($layoutFile)) {
+            $layout = \File::get($layoutFile);
+
+            $layout = str_replace("<!--[linkToModels]-->", "<a href=\"{{ url('".$this->nameOf("viewFolder")."') }}\" class=\"list-group-item\">".$this->model->upper()."</a>\n<!--[linkToModels]-->", $layout);
+
+            \File::put($layoutFile, $layout);
+        }
+    }
+
+    /**
+     * @param $fileContents
+     * @param $newModel
+     * @return string
+     */
+    private function addRelationships($fileContents, $newModel = true)
+    {
+        if(!$newModel) {
+            $fileContents = substr($fileContents, 0, strrpos($fileContents, "}"));
+        }
+
+        foreach ($this->model->getRelationships() as $relation) {
+            $relatedModel = $relation->model;
+
+            if(strpos($fileContents, $relation->getName()) !== false && !$newModel)
+                continue;
+
+            $functionContent = "\t\treturn \$this->" . $relation->getType() . "('" . $relatedModel->nameWithNamespace() . "');\n";
+            $fileContents .= $this->fileCreator->createFunction($relation->getName(), $functionContent);
+
+            $relatedModelFile = $this->configSettings['pathTo']['models'] . $relatedModel->upper() . '.php';
+
+            if (!\File::exists($relatedModelFile)) {
+                if ($this->fromFile)
+                    continue;
+                else {
+                    $editRelatedModel = $this->command->confirm("Model " . $relatedModel->upper() . " doesn't exist yet. Would you like to create it now [y/n]? ", true);
+                    if ($editRelatedModel)
+                        $this->fileCreator->createClass($relatedModelFile, "", array('name' => "\\Eloquent"));
+                    else
+                        continue;
+                }
+            }
+
+            $content = \File::get($relatedModelFile);
+            if (preg_match("/function " . $this->model->lower() . "/", $content) !== 1 && preg_match("/function " . $this->model->plural() . "/", $content) !== 1) {
+                $index = 0;
+                $reverseRelations = $relation->reverseRelations();
+
+                if (count($reverseRelations) > 1) {
+                    $index = $this->command->ask($relatedModel->upper() . " (0=" . $reverseRelations[0] . " OR 1=" . $reverseRelations[1] . ") " . $this->model->upper() . "? ");
+                }
+
+                $reverseRelationType = $reverseRelations[$index];
+                $reverseRelationName = $relation->getReverseName($this->model, $reverseRelationType);
+
+                $content = substr($content, 0, strrpos($content, "}"));
+                $functionContent = "\t\treturn \$this->" . $reverseRelationType . "('" . $this->model->nameWithNamespace() . "');\n";
+                $content .= $this->fileCreator->createFunction($reverseRelationName, $functionContent) . "}\n";
+
+                \File::put($relatedModelFile, $content);
+            }
+        }
+        return $fileContents;
     }
 
     private function getControllerType()
@@ -333,565 +440,6 @@ class Scaffold
         $this->command->info('Or group like properties: University hasMany Department string( name city state homepage )');
     }
 
-    private function getLaravelClassNames()
-    {
-        $classNames = array();
-
-        $aliases = \Config::get('app.aliases');
-        foreach ($aliases as $alias => $facade) {
-            array_push($classNames, strtolower($alias));
-        }
-
-        return $classNames;
-    }
-
-    private function resetModels()
-    {
-        $this->relationship = array();
-        if(!$this->namespaceGlobal)
-            $this->namespace = "";
-        $this->propertiesArr = array();
-        $this->propertiesStr = "";
-        $this->model = null;
-        $this->fillForeignKeys = array();
-        $this->timestamps = true;
-        $this->softDeletes = false;
-        $this->columnAdded = false;
-        $this->onlyMigration = false;
-    }
-
-    private function getModelsWithRelationships(&$values)
-    {
-        if($this->nextArgumentIsRelation($values[0])) {
-            $relationship = $values[0];
-            $relatedTable = trim($values[1], ',');
-
-            $namespace = $this->namespace;
-
-            if(strpos($relatedTable, "\\"))
-                $model = substr(strrchr($relatedTable, "\\"), 1);
-            else
-                $model = $relatedTable;
-
-            if(!$this->namespaceGlobal) {
-                $namespace = $this->getNamespace($relatedTable);
-            }
-
-            $i = 2;
-
-            $this->relationship = array();
-            array_push($this->relationship, new Relation($relationship, new Model($model, $namespace)));
-
-            while($i < count($values) && $this->nextArgumentIsRelation($values[$i])) {
-                if(strpos($values[$i], ",") === false) {
-                    $next = $i + 1;
-                    if($this->isLastRelation($values, $next)) {
-                        $relationship = $values[$i];
-                        $relatedTable = trim($values[$next], ',');
-                        $i++;
-                        unset($values[$next]);
-                    } else {
-                        $relatedTable = $values[$i];
-                    }
-                } else {
-                    $relatedTable = trim($values[$i], ',');
-                }
-
-                $namespace = $this->namespace;
-
-                if(strpos($relatedTable, "\\"))
-                    $model = substr(strrchr($relatedTable, "\\"), 1);
-                else
-                    $model = $relatedTable;
-
-                if(!$this->namespaceGlobal) {
-                    $namespace = $this->getNamespace($relatedTable);
-                }
-
-                array_push($this->relationship, new Relation($relationship, new Model($model, $namespace)));
-                unset($values[$i]);
-                $i++;
-            }
-
-            unset($values[0]);
-            unset($values[1]);
-        }
-    }
-
-    private function getPropertiesFromInput($fieldNames)
-    {
-        $bundled = false;
-        $fieldName = "";
-        $type = "";
-        $properties = array();
-
-        foreach($fieldNames as $field)
-        {
-            $skip = false;
-            $pos = strrpos($field, ":");
-            if ($pos !== false && !$bundled)
-            {
-                $type = substr($field, $pos+1);
-                $fieldName = substr($field, 0, $pos);
-            } else if(strpos($field, '(') !== false) {
-                $type = substr($field, 0, strpos($field, '('));
-                $bundled = true;
-                $skip = true;
-            } else if($bundled) {
-                if($pos !== false && strpos($field, ")") === false) {
-                    $fieldName = substr($field, $pos+1);
-                    $num = substr($field, 0, $pos);
-                } else if(strpos($field, ")") !== false){
-                    $skip = true;
-                    $bundled = false;
-                } else {
-                    $fieldName = $field;
-                }
-            } else if (strpos($field, "-") !== false) {
-                $option = substr($field, strpos($field, "-")+1, strlen($field) - (strpos($field, "-")+1));
-                if($option == "nt") {
-                    $this->timestamps = false;
-                    $skip = true;
-                }
-                if($option == "sd") {
-                    $this->softDeletes = true;
-                    $skip = true;
-                }
-                if($option == "pivot") {
-                    $this->onlyMigration = true;
-                    $skip = true;
-                }
-            }
-
-            $fieldName = trim($fieldName, ",");
-
-            $type = strtolower($type);
-
-            if(!$skip && !empty($fieldName)) {
-                if(!array_key_exists($type, $this->validTypes)) {
-                    $this->command->error($type. " is not a valid property type! ");
-                    $this->resetModels();
-                    if($this->fromFile)
-                        exit;
-                    else
-                        $this->createModels();
-                }
-
-                $properties[$fieldName] = $type;
-            }
-        }
-
-        return $properties;
-    }
-
-    private function getNamespace($modelWithNamespace)
-    {
-        return substr($modelWithNamespace, 0, strrpos($modelWithNamespace, "\\"));
-    }
-
-    private function getModel($modelWithNamespace)
-    {
-        if(strpos($modelWithNamespace, "\\"))
-            $model = substr(strrchr($modelWithNamespace, "\\"), 1);
-        else
-            $model = $modelWithNamespace;
-
-        return new Model($model, $this->namespace);
-    }
-
-    private function isLastRelation($values, $next)
-    {
-        return ($next < count($values) && $this->nextArgumentIsRelation($values[$next]));
-    }
-
-    private function nextArgumentIsRelation($value)
-    {
-        return strpos($value, ":") === false && strpos($value, "(") === false;
-    }
-
-    private function createMigrations()
-    {
-        $tableName = $this->model->getTableName();
-
-        $tableCreated = $this->isTableCreated($this->model->getTableName());
-
-        if($tableCreated) {
-            $migrationName = "edit_" . $tableName . "_table";
-        } else {
-            $migrationName = "create_" . $tableName . "_table";
-        }
-
-        if ($handle = opendir($this->configSettings['pathTo']['migrations'])) {
-            while (false !== ($entry = readdir($handle))) {
-                if ($entry[0] != ".") {
-                    if(strpos($entry, $migrationName) !== false) {
-                        $index = strpos($entry, "_");
-                        $index = strpos($entry, "_", $index+1);
-                        $index = strpos($entry, "_", $index+1);
-                        $index = strpos($entry, "_", $index+1);
-
-                        $migrationFilename = substr($entry, $index+1, strrpos($entry, ".")-($index+1));
-                        $halfMigration = substr($migrationFilename, 0, strrpos($migrationFilename, "_"));
-                        $lastSegment = substr(strrchr($migrationFilename, "_"), 1);
-                        if(is_numeric($lastSegment)) {
-                            $migrationName = $halfMigration . "_" . ($lastSegment+1);
-                        } else {
-                            $migrationName = $migrationFilename . "_2";
-                        }
-                    }
-                }
-            }
-            closedir($handle);
-        }
-
-        $functionContents = $this->migrationUp($tableCreated);
-
-        if($this->columnAdded) {
-            if(!$this->lastTimeStamp) {
-                $this->lastTimeStamp['day'] = date("Y_m_d");
-                $this->lastTimeStamp['second'] = date("His");
-            } else {
-                $this->lastTimeStamp['second']++;
-            }
-
-            $migrationFile = $this->configSettings['pathTo']['migrations']
-                . $this->lastTimeStamp['day'] . "_" . $this->lastTimeStamp['second']
-                . "_" . $migrationName . ".php";
-
-            $classNameArr = explode("_", $migrationName);
-            $className = "";
-            foreach($classNameArr as $class) {
-                $className .= ucfirst($class);
-            }
-
-            $fileContents = $this->fileCreator->createFunction("up", $functionContents);
-            if(!$tableCreated) {
-                $functionContents = "\t\tSchema::dropIfExists('".$tableName."');\n";
-            } else {
-                $functionContents = "\t\tSchema::table('".$tableName."', function(\$table) {\n";
-                $functionContents .="\t\t\t\$table->dropColumn(";
-                foreach ($this->columnsAdded as $column) {
-                    $functionContents .= "'$column',";
-                }
-                $functionContents = rtrim($functionContents, ",");
-                $functionContents .= ");\n\t\t});\n";
-            }
-
-            $fileContents .= $this->fileCreator->createFunction("down", $functionContents);
-
-            $this->fileCreator->createMigrationClass($migrationFile, $fileContents, $className);
-        }
-    }
-
-    /**
-     * @param $content
-     * @return string
-     */
-    protected function addSoftDeletes()
-    {
-        $content = "";
-
-        if ($this->softDeletes) {
-            if (!$this->tableHasColumn($this->model->getTableName(), "deleted_at")) {
-                $this->columnAdded = true;
-                array_push($this->columnsAdded, "deleted_at");
-                $content = "\t\t\t" . $this->setColumn('softDeletes', null) . ";\n";
-            }
-        }
-        return $content;
-    }
-
-    private $columnsAdded = array();
-
-    protected function migrationUp($tableCreated = false)
-    {
-        $type = $tableCreated ? "table" : "create";
-
-        $content = "\t\tSchema::$type('".$this->model->getTableName()."', function(Blueprint \$table) {\n";
-
-        if(!$tableCreated)
-            $content .= "\t\t\t" . $this->setColumn('increments', 'id') . ";\n";
-
-        $content .= $this->addColumns($this->model->getTableName());
-
-        $content .= $this->addTimestamps();
-
-        $content .= $this->addSoftDeletes();
-
-        $content .= $this->addForeignKeys();
-        $content .= "\t\t});\n";
-
-        foreach($this->relationship as $relation) {
-            if($relation->getType() == "belongsToMany") {
-
-                $tableOne = $this->model->tableNameLower();
-                $tableTwo = $relation->model->tableNameLower();
-
-                $tableName = $this->getPivotTableName($tableOne, $tableTwo);
-
-                if(!$this->isTableCreated($tableName)) {
-                    $this->columnAdded = true;
-                    array_push($this->tablesAdded, $tableName);
-                    $content .= "\t\tSchema::create('".$tableName."', function(Blueprint \$table) {\n";
-                    $content .= "\t\t\t\$table->integer('".$tableOne."_id')->unsigned();\n";
-                    $content .= "\t\t\t\$table->integer('".$tableTwo."_id')->unsigned();\n";
-                    $content .= "\t\t});\n";
-                }
-            } else if($relation->getType() == "hasOne" || $relation->getType() == "hasMany") {
-                if($this->tableHasColumn($relation->model->getTableName() ,$this->model->lower()."_id")) {
-                    if(!$tableCreated) {
-                        $content .= "\t\tSchema::table('".$relation->model->getTableName()."', function(Blueprint \$table) {\n";
-                        $content .= "\t\t\t\$table->foreign('". $this->model->tableNameLower()."_id')->references('id')->on('".$this->model->getTableName()."');\n";
-                        $content .= "\t\t});\n";
-                    }
-                } else if($this->isTableCreated($relation->model->getTableName()) && !$this->tableHasColumn($relation->model->getTableName(), $this->model->tableNameLower()."_id")) {
-                    $this->columnAdded = true;
-                    $column = $this->model->tableNameLower()."_id";
-                    array_push($this->columnsAdded, $column);
-                    $content .= "\t\tSchema::table('".$relation->model->getTableName()."', function(Blueprint \$table) {\n";
-                    $content .= "\t\t\t\$table->integer('". $column."')->unsigned();\n";
-                    $content .= "\t\t\t\$table->foreign('". $column."')->references('id')->on('".$this->model->getTableName()."');\n";
-                    $content .= "\t\t});\n";
-                }
-            }
-        }
-        return $content;
-    }
-
-    private function tableHasColumn($tableName, $columnName)
-    {
-        if(\Schema::hasColumn($tableName, $columnName)) {
-            return true;
-        }
-
-        $search = "/Schema::(table|create).*'$tableName',.*\(.*\).*{.*'$columnName'.*}\);/s";
-
-        return $this->searchInMigrationFiles($search);
-    }
-
-    public function isColumnOfType($table, $column, $type)
-    {
-        $isColumnOfType = $this->isColumnOfTypeInMigrationFiles($table, $column, $type);;
-
-        if($isColumnOfType)
-            return true;
-
-        $isColumnOfType = $this->isColumnOfTypeInDb($table, $column, $type);
-
-        return $isColumnOfType;
-    }
-
-    public function isColumnOfTypeInDb($table, $column, $type)
-    {
-        switch (\DB::connection()->getConfig('driver')) {
-            case 'pgsql':
-                $query = "SELECT column_name FROM information_schema.columns WHERE table_name = '".$table."'";
-                break;
-
-            case 'mysql':
-                $query = "SELECT data_type FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = N'".$table."' AND COLUMN_NAME = N'".$column."' AND TABLE_SCHEMA = N'".\DB::connection()->getConfig('database')."'";
-                break;
-
-            case 'sqlsrv':
-                $parts = explode('.', $table);
-                $num = (count($parts) - 1);
-                $table = $parts[$num];
-                $query = "SELECT column_name FROM ".\DB::connection()->getConfig('database').".INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = N'".$table."'";
-                break;
-
-            default:
-                $error = 'Database driver not supported: '.\DB::connection()->getConfig('driver');
-                throw new \Exception($error);
-                break;
-        }
-
-        $column_type = \DB::select($query);
-
-        if(!empty($column_type))
-            $column_type = $column_type[0]->data_type;
-
-        $newType = $type;
-
-        if(array_key_exists($newType, $this->dataTypes))
-            $newType = $this->dataTypes[$newType];
-
-        if($column_type == $newType)
-            return true;
-
-        return false;
-    }
-
-    private function isColumnOfTypeInMigrationFiles($table, $column, $type)
-    {
-        $search = "/Schema::(table|create).*'$table',.*\(.*\).*{.*$type\('$column'.*\).*}\);/s";
-        $anotherColumn = "/Schema::(table|create).*'$table',.*\(.*\).*{.*\('$column'.*\).*}\);/s";
-
-        $found = false;
-
-        if ($handle = opendir($this->configSettings['pathTo']['migrations'])) {
-            while (false !== ($entry = readdir($handle))) {
-                if ($entry[0] != ".") {
-                    $fileName = $this->configSettings['pathTo']['migrations'].$entry;
-
-                    $contents = \File::get($fileName);
-
-                    if(!$found) {
-                        $matched = preg_match($search, $contents);
-
-                        if($matched !== false && $matched != 0)
-                            $found = true;
-                    }
-
-                    if($found) {
-                        $matched = preg_match($anotherColumn, $contents);
-
-                        if($matched !== false && $matched != 0)
-                            $found = false;
-                    }
-                }
-            }
-            closedir($handle);
-        }
-
-        return $found;
-    }
-
-    private function searchInMigrationFiles($search)
-    {
-        $found = false;
-
-        if ($handle = opendir($this->configSettings['pathTo']['migrations'])) {
-            while (false !== ($entry = readdir($handle))) {
-                if ($entry[0] != ".") {
-                    $fileName = $this->configSettings['pathTo']['migrations'].$entry;
-
-                    $contents = \File::get($fileName);
-                    $matched = preg_match($search, $contents);
-                    if($matched !== false && $matched != 0) {
-                        $found = true;
-                        break;
-                    }
-                }
-            }
-            closedir($handle);
-        }
-
-        return $found;
-    }
-
-    private $dataTypes = array(
-        'string' =>'varchar',
-        'morphs' => 'integer',
-        'binary' => 'blob',
-        'biginteger'=> 'bigint',
-        'smallinteger'=> 'smallint',
-        'tinyinteger'=> 'tinyint'
-    );
-
-    private function getPivotTableName($tableOne, $tableTwo)
-    {
-        if($tableOne[0] > $tableTwo[0])
-            $tableName = $tableTwo ."_".$tableOne;
-        else
-            $tableName = $tableOne ."_".$tableTwo;
-
-        return $tableName;
-    }
-
-    private function isTableCreated($tableName)
-    {
-        $found = false;
-        if(\Schema::hasTable($tableName)) {
-            return true;
-        }
-
-        if ($handle = opendir($this->configSettings['pathTo']['migrations'])) {
-            while (false !== ($entry = readdir($handle))) {
-                if ($entry != "." && $entry != "..") {
-                    $fileName = $this->configSettings['pathTo']['migrations'].$entry;
-
-                    $contents = \File::get($fileName);
-                    if(strpos($contents, "Schema::create('$tableName'") !== false) {
-                        $found = true;
-                        break;
-                    }
-                }
-            }
-            closedir($handle);
-        }
-
-        return $found;
-    }
-
-    private $fillForeignKeys = array();
-
-    private function addForeignKeys()
-    {
-        $fields = "";
-        foreach($this->relationship as $relation) {
-            if($relation->getType() == "belongsTo") {
-                $foreignKey = $relation->model->tableNameLower() . "_id";
-                if(!$this->tableHasColumn($this->model->getTableName(), $foreignKey)) {
-                    $this->columnAdded = true;
-                    array_push($this->columnsAdded, $foreignKey);
-                    $fields .= "\t\t\t" .$this->setColumn('integer', $foreignKey);
-                    $fields .= $this->addColumnOption('unsigned') . ";\n";
-                    if($this->isTableCreated($relation->model->getTableName())) {
-                        $fields .= "\t\t\t\$table->foreign('". $foreignKey."')->references('id')->on('".$relation->model->getTableName()."');\n";
-                        array_push($this->fillForeignKeys, $foreignKey);
-                    }
-                }
-            }
-        }
-        return $fields;
-    }
-
-    protected function increment()
-    {
-        return "\$table->increments('id')";
-    }
-
-    protected function setColumn($type, $field = '')
-    {
-        return empty($field)
-            ? "\$table->$type()"
-            : "\$table->$type('$field')";
-    }
-
-    protected function addColumnOption($option)
-    {
-        return "->{$option}()";
-    }
-
-    protected function addColumns($tableName = "")
-    {
-        $content = '';
-
-        foreach( $this->propertiesArr as $field => $type ) {
-
-            if(!empty($tableName) && !$this->tableHasColumn($tableName, $field)) {
-                $this->columnAdded = true;
-                $rule = "\t\t\t";
-
-                // Primary key check
-                if ( $field === 'id' and $type === 'integer' )
-                    $rule .= $this->increment();
-                else {
-                    $rule .= $this->setColumn($this->validTypes[$type], $field);
-
-                    if ( !empty($setting) )
-                        $rule .= $this->addColumnOption($setting);
-                }
-
-                array_push($this->columnsAdded, $field);
-
-                $content .= $rule . ";\n";
-            }
-        }
-
-        return $content;
-    }
-
     private function runMigrations()
     {
         if(!$this->fromFile) {
@@ -913,63 +461,6 @@ class Scaffold
                     }
                 }
             }
-        }
-    }
-
-    private function createModel()
-    {
-        $fileName = $this->configSettings['pathTo']['models'] . $this->nameOf("modelName") . ".php";
-
-        if(\File::exists($fileName)) {
-            $this->updateModel($fileName);
-            $this->model->exists = true;
-            return;
-        }
-
-        $fileContents = "protected \$table = '". $this->model->getTableName() ."';\n";
-
-        if(!$this->timestamps)
-            $fileContents .= "\tpublic \$timestamps = false;\n";
-
-        if($this->softDeletes)
-            $fileContents .= "\tprotected \$softDelete = true;\n";
-
-        $properties = "";
-        foreach ($this->propertiesArr as $property => $type) {
-            $properties .= "'$property',";
-        }
-
-        $properties = rtrim($properties, ",");
-
-        $fileContents .= "\tprotected \$fillable = array(".$properties.");\n";
-
-        $fileContents = $this->addRelationships($fileContents);
-
-        $template = $this->configSettings['useRepository'] ? "model.txt" : "model-no-repo.txt";
-
-        $this->makeFileFromTemplate($fileName, $this->configSettings['pathTo']['templates'].$template, $fileContents);
-
-        $this->updateLayoutFile();
-    }
-
-    private function updateModel($fileName)
-    {
-        $fileContents = \File::get($fileName);
-
-        $fileContents = $this->addRelationships($fileContents, false) . "\n}";
-
-        \File::put($fileName, $fileContents);
-    }
-
-    private function updateLayoutFile()
-    {
-        $layoutFile = $this->configSettings['pathTo']['layout'];
-        if(\File::exists($layoutFile)) {
-            $layout = \File::get($layoutFile);
-
-            $layout = str_replace("<!--[linkToModels]-->", "<a href=\"{{ url('".$this->nameOf("viewFolder")."') }}\" class=\"list-group-item\">".$this->model->upper()."</a>\n<!--[linkToModels]-->", $layout);
-
-            \File::put($layoutFile, $layout);
         }
     }
 
@@ -1001,7 +492,7 @@ class Scaffold
 
         $functionContent .= "\t\t\t\$".$this->model->lower()." = array(\n";
 
-        foreach($this->propertiesArr as $property => $type) {
+        foreach($this->model->getProperties() as $property => $type) {
 
             if($property == "password") {
                 $functionContent .= "\t\t\t\t'$property' => \\Hash::make('password'),\n";
@@ -1053,7 +544,7 @@ class Scaffold
             }
         }
 
-        foreach($this->fillForeignKeys as $key) {
+        foreach($this->migration->getForeignKeys() as $key) {
             $functionContent .= "\t\t\t\t'$key' => \$i,\n";
         }
 
@@ -1078,6 +569,7 @@ class Scaffold
             \File::put($databaseSeeder, $content);
         }
     }
+
     /**
      * @return array
      */
@@ -1200,7 +692,7 @@ class Scaffold
 
             try{
                 $this->makeFileFromTemplate($fileName, $pathToViews."$view.txt");
-            } catch(\Illuminate\Filesystem\FileNotFoundException $e) {
+            } catch(FileNotFoundException $e) {
                 $this->command->error("Template file ".$pathToViews . $view.".txt does not exist! You need to create it to generate that file!");
             }
         }
@@ -1210,7 +702,7 @@ class Scaffold
     {
         try {
             $fileContents = \File::get($template);
-        } catch(\Illuminate\Filesystem\FileNotFoundException $e) {
+        } catch(FileNotFoundException $e) {
             $shortTemplate = substr($template, strpos($template, $this->configSettings["pathTo"]["templates"]) + strlen($this->configSettings["pathTo"]["templates"]),strlen($template)-strlen($this->configSettings["pathTo"]["templates"]));
             $this->fileCreator->copyFile("vendor/jrenton/laravel-scaffold/src/Jrenton/LaravelScaffold/templates/".$shortTemplate, $template);
             $fileContents = \File::get($template);
@@ -1265,7 +757,7 @@ class Scaffold
             $replaceThis = substr($fileContents, $beginning, $end-$beginning);
             $propertyTemplate = substr($fileContents, $lastPos, $endProp - $lastPos);
             $properties = "";
-            foreach($this->propertiesArr as $property => $type) {
+            foreach($this->model->getProperties() as $property => $type) {
                 $temp = str_replace("[property]", $property, $propertyTemplate);
                 $temp = str_replace("[Property]", ucfirst($property), $temp);
                 $properties .= $temp;
@@ -1275,129 +767,5 @@ class Scaffold
         }
 
         return $fileContents;
-    }
-
-    /**
-     * @param $fileContents
-     * @return string
-     */
-    private function addRelationships($fileContents, $newModel = true)
-    {
-        if(!$newModel) {
-            $fileContents = substr($fileContents, 0, strrpos($fileContents, "}"));
-        }
-
-        foreach ($this->relationship as $relation) {
-            $relatedModel = $relation->model;
-
-            if(strpos($fileContents, $relation->getName()) !== false && !$newModel)
-                continue;
-
-            $functionContent = "\t\treturn \$this->" . $relation->getType() . "('" . $relatedModel->nameWithNamespace() . "');\n";
-            $fileContents .= $this->fileCreator->createFunction($relation->getName(), $functionContent);
-
-            $relatedModelFile = $this->configSettings['pathTo']['models'] . $relatedModel->upper() . '.php';
-
-            if (!\File::exists($relatedModelFile)) {
-                if ($this->fromFile)
-                    continue;
-                else {
-                    $editRelatedModel = $this->command->confirm("Model " . $relatedModel->upper() . " doesn't exist yet. Would you like to create it now [y/n]? ", true);
-                    if ($editRelatedModel)
-                        $this->fileCreator->createClass($relatedModelFile, "", array('name' => "\\Eloquent"));
-                    else
-                        continue;
-                }
-            }
-
-            $content = \File::get($relatedModelFile);
-            if (preg_match("/function " . $this->model->lower() . "/", $content) !== 1 && preg_match("/function " . $this->model->plural() . "/", $content) !== 1) {
-                $index = 0;
-                $reverseRelations = $relation->reverseRelations();
-
-                if (count($reverseRelations) > 1) {
-                    $index = $this->command->ask($relatedModel->upper() . " (0=" . $reverseRelations[0] . " OR 1=" . $reverseRelations[1] . ") " . $this->model->upper() . "? ");
-                }
-
-                $reverseRelationType = $reverseRelations[$index];
-                $reverseRelationName = $relation->getReverseName($this->model, $reverseRelationType);
-
-                $content = substr($content, 0, strrpos($content, "}"));
-                $functionContent = "\t\treturn \$this->" . $reverseRelationType . "('" . $this->model->nameWithNamespace() . "');\n";
-                $content .= $this->fileCreator->createFunction($reverseRelationName, $functionContent) . "}\n";
-
-                \File::put($relatedModelFile, $content);
-            }
-        }
-        return $fileContents;
-    }
-
-    /**
-     * @param $content
-     * @return string
-     */
-    private function addTimestamps()
-    {
-        $content = "";
-        if ($this->timestamps) {
-            if (!$this->tableHasColumn($this->model->getTableName(), "created_at")) {
-                $this->columnAdded = true;
-                $content .= "\t\t\t" . $this->setColumn("timestamp", "created_at") . ";\n";
-            }
-            if (!$this->tableHasColumn($this->model->getTableName(), "updated_at")) {
-                $this->columnAdded = true;
-                $content .= "\t\t\t" . $this->setColumn("timestamp", "updated_at") . ";\n";
-            }
-        }
-        return $content;
-    }
-
-    private function differences($fileOne, $fileTwo)
-    {
-        $inputFile = file($fileOne);
-
-        $fileOneContents = array();
-
-        foreach( $inputFile as $line_num => $modelAndProperties ) {
-            $lineContents = preg_split('/\s+/', $modelAndProperties, -1, PREG_SPLIT_NO_EMPTY);
-            array_push($fileOneContents, $lineContents);
-        }
-
-        $inputFile = file($fileTwo);
-
-        $fileTwoContents = array();
-
-        foreach( $inputFile as $line_num => $modelAndProperties ) {
-            $lineContents = preg_split('/\s+/', $modelAndProperties, -1, PREG_SPLIT_NO_EMPTY);
-            array_push($fileTwoContents, $lineContents);
-        }
-
-        $max = count($fileOneContents);
-        if(count($fileTwoContents) > $max)
-            $max = count($fileTwoContents);
-
-        $changes = array();
-
-        for($i = 0; $i < $max; $i++) {
-            if(array_key_exists($i, $fileOneContents)) {
-                if(array_key_exists($i, $fileTwoContents)) {
-                    $diff = array_diff($fileOneContents[$i], $fileTwoContents[$i]);
-                    //$diff2 = array_diff($fileOneContents[$i], $fileTwoContents[$i]);
-                    //$totalDiff = array_merge($diff, $diff2);
-
-                    if(count($diff) > 0) {
-                        array_unshift($diff, $fileTwoContents[$i][0]);
-                        $modelStr = implode(" ", $diff);
-                        array_push($changes, $modelStr);
-                    }
-                } else {
-                    array_push($changes, implode(" ", $fileOneContents[$i]));
-                }
-            } else {
-                array_push($changes, implode(" ", $fileTwoContents[$i]));
-            }
-        }
-
-        return $changes;
     }
 }

@@ -2,15 +2,25 @@
 
 class Relation
 {
+    /**
+     * @var string
+     */
     private $relationType;
+
+    /**
+     * @var BaseModel
+     */
     public $model;
 
-    public function __construct($relationType, Model $model)
+    public function __construct($relationType, BaseModel $model)
     {
         $this->relationType = strtolower($relationType);
         $this->model = $model;
     }
 
+    /**
+     * @return array
+     */
     public function reverseRelations()
     {
         $reverseRelations = array();
@@ -32,11 +42,17 @@ class Relation
         return $reverseRelations;
     }
 
+    /**
+     * @return string
+     */
     public function getTableName()
     {
         return $this->model->upper();
     }
 
+    /**
+     * @return string
+     */
     public function getType()
     {
         switch($this->relationType) {
@@ -53,8 +69,15 @@ class Relation
                 return "hasMany";
                 break;
         }
+
+        return "";
     }
 
+    /**
+     * @param Model $model
+     * @param string $type
+     * @return string
+     */
     public function getName(Model $model = null, $type = "")
     {
         $relationName = "";
@@ -79,6 +102,11 @@ class Relation
         return $relationName;
     }
 
+    /**
+     * @param Model $model
+     * @param $type
+     * @return string
+     */
     public function getReverseName(Model $model, $type)
     {
         return $this->getName($model, strtolower($type));
