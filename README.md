@@ -22,6 +22,24 @@ That's it! You're all set to go. Run the `artisan` command from the Terminal to 
 
     php artisan
 
+## Configuration
+
+Configure all file directories, class names, view files, whether or not you want repository pattern, which css/js files to download, and you can completely customize view and layout files from within the templates folder! Be sure to run:
+
+`php artisan config:publish jrenton/laravel-scaffold`
+
+To include the config file within your config folder.
+
+## Commands
+
+`scaffold` will prompt you for a layout file and models
+
+`scaffold:model` will prompt you for models
+
+`scaffold:file "filename"` is how you can add multiple models from one file
+
+`scaffold:update` searches for changes in the model definitions file (defined in your config file), and updates your models/migrations accordingly.
+
 ## New features
 
 ###Keep a running list of your model definitions
@@ -54,21 +72,6 @@ If namespace is set, then it is applied globally, else you can namespace specifi
 `-nt` is an option that sets timestamps to false on the particular model.
 
 `-sd` is an option that sets softDelete to true on the particular model.
-
-###Configurations
-
-This now comes with a configuration file. Configure all file directories, class names, view files, whether or not you want repository pattern, which css/js files to download, and you can completely customize view and layout files from within the templates folder! Be sure to run:
-
-`php artisan config:publish jrenton/laravel-scaffold`
-
-To include the config file within your config folder!
-
-## Commands
-
-`scaffold` will prompt you for a layout file and models
-`scaffold:model` will prompt you for models
-`scaffold:file "filename"` is how you can add multiple models from one file
-`scaffold:update` searches for changes in the model definitions file (defined in your config file), and updates your models/migrations accordingly.
 
 ### Accepted arguments at the add model prompt
 
