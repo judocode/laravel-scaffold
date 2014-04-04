@@ -3,41 +3,57 @@
 class Migration
 {
     /**
+     *  Foreign keys for the migration
+     *
      * @var array
      */
-    private $fillForeignKeys = array();
+    private $foreignKeys = array();
 
     /**
+     *  Flag to determine if columns have changed
+     *
      * @var bool
      */
     private $columnsChanged = false;
 
     /**
+     *  Columns that have been added to the migration
+     *
      * @var array
      */
     private $columnsAdded = array();
 
     /**
+     *  Model associated with migration
+     *
      * @var Model
      */
     private $model;
 
     /**
+     *  Path to the migrations
+     *
      * @var string
      */
     private $migrationsPath;
 
     /**
+     *  Tables that have been added in the migration
+     *
      * @var array
      */
     private $tablesAdded = array();
 
     /**
+     *  File creator
+     *
      * @var FileCreator
      */
     private $fileCreator;
 
     /**
+     *  Content of the current file
+     *
      * @var string
      */
     private $currentFileContents;
@@ -91,13 +107,20 @@ class Migration
     }
 
     /**
+     *  Return the foreign keys
+     *
      * @return array
      */
     public function getForeignKeys()
     {
-        return $this->fillForeignKeys;
+        return $this->foreignKeys;
     }
 
+    /**
+     *  Migration to drop a table
+     *
+     * @param $timestamp
+     */
     public function dropTable(&$timestamp)
     {
         $migrationName = "edit_" . $this->model->getTableName() . "_table";
@@ -124,6 +147,8 @@ class Migration
     }
 
     /**
+     *  Add soft deletes to the migration
+     *
      * @return string
      */
     protected function addSoftDeletes()
@@ -144,6 +169,8 @@ class Migration
     }
 
     /**
+     *  The up portion of the migration
+     *
      * @param bool $tableCreated
      * @return string
      */
@@ -213,6 +240,8 @@ class Migration
     }
 
     /**
+     *  Check to see if a table has a column
+     *
      * @param string $tableName
      * @param string $columnName
      * @return bool
@@ -238,6 +267,8 @@ class Migration
     }
 
     /**
+     *  Check the type of the column
+     *
      * @param string $table
      * @param string $column
      * @param string $type
@@ -256,6 +287,8 @@ class Migration
     }
 
     /**
+     *  Check the type of a column in the database
+     *
      * @param string $table
      * @param string $column
      * @param string $type
@@ -304,9 +337,11 @@ class Migration
     }
 
     /**
-     * @param $table
-     * @param $column
-     * @param $type
+     *  Check the type of column in the migration files
+     *
+     * @param string $table
+     * @param string $column
+     * @param string $type
      * @return bool
      */
     private function isColumnOfTypeInMigrationFiles($table, $column, $type)
@@ -318,14 +353,20 @@ class Migration
     }
 
     /**
-     * @param $search
-     * @param string $fallback
+     *  Search for specified regex in the migration files.
+     *  Reverse is the opposite of the search (equivalent of the down)
+     *
+     * @param string $search
+     * @param string $reverse
      * @return bool
      */
-    private function searchInMigrationFiles($search, $fallback = "")
+    private function searchInMigrationFiles($search, $reverse = "")
     {
         $found = false;
 
+        // First it checks for $search, and then check if the
+        //  $reverse follows it (essentially checking if the
+        //  original search is undone)
         if ($handle = opendir($this->migrationsPath))
         {
             while (false !== ($entry = readdir($handle)))
@@ -336,6 +377,7 @@ class Migration
 
                     $contents = \File::get($fileName);
 
+                    // If $search isn't found, search for it
                     if(!$found)
                     {
                         $matched = preg_match($search, $contents);
@@ -346,9 +388,10 @@ class Migration
                         }
                     }
 
-                    if(!empty($fallback) && $found)
+                    // If $search was found, check to see if it's been undone
+                    if(!empty($reverse) && $found)
                     {
-                        $matched = preg_match($fallback, $contents);
+                        $matched = preg_match($reverse, $contents);
 
                         if($matched !== false && $matched != 0)
                         {
@@ -373,6 +416,8 @@ class Migration
     );
 
     /**
+     *  Get the pivot table name for the two specified tables
+     *
      * @param string $tableOne
      * @param string $tableTwo
      * @return string
@@ -388,35 +433,35 @@ class Migration
     }
 
     /**
+     *  Check to see if a table has been created
+     *
      * @param string $tableName
      * @return bool
      */
     private function isTableCreated($tableName)
     {
-        //$search = "/public\s+function\s+up.*Schema::(table|create)\s*\(\s*'$tableName'.*\-\>\s*(?!dropColumn).*\(\s*'$columnName'.*public\s+function\s+down/s";
-        //$notDown = "/public\s+function\s+up.*Schema::(table|create)\s*\(\s*'$tableName'.*\-\>\s*dropColumn\s*\(\s*'$columnName'.*public\s+function\s+down/s";
-
         $search = "/public\s+function\s+up.*Schema\s*::\s*create\s*\(\s*'$tableName'.*public\s+function\s+down/s";
-        $drop = "/public\s+function\s+up.*Schema\s*::\s*drop\w*\s*\(\s*'$tableName'.*public\s+function\s+down/s";
+        $reverse = "/public\s+function\s+up.*Schema\s*::\s*drop\w*\s*\(\s*'$tableName'.*public\s+function\s+down/s";
 
-        $matched = preg_match($drop, $this->currentFileContents);
+        $matched = preg_match($reverse, $this->currentFileContents);
 
         if($matched > 0)
             return false;
 
-        return $this->searchInMigrationFiles($search, $drop);
-
-        //if(!$found && \Schema::hasTable($tableName))
-        //    return true;
+        return $this->searchInMigrationFiles($search, $reverse);
     }
 
     /**
+     *  Add the foreign keys to the migration file
+     *
      * @return string
      */
     private function addForeignKeys()
     {
         $fields = "";
 
+        // BelongsTo relations need to be added to the current migration
+        //  in the format of model_id
         foreach($this->model->getRelationships() as $relation)
         {
             if($relation->isBelongsTo())
@@ -437,7 +482,7 @@ class Migration
                     {
                         $fields .= "\t\t\t\$table->foreign('". $foreignKey."')->references('id')->on('".$relation->model->getTableName()."');\n";
 
-                        array_push($this->fillForeignKeys, $foreignKey);
+                        array_push($this->foreignKeys, $foreignKey);
                     }
                 }
             }
@@ -446,6 +491,8 @@ class Migration
     }
 
     /**
+     *  Adds the increments (id) column to the migration
+     *
      * @return string
      */
     protected function increment()
@@ -454,6 +501,8 @@ class Migration
     }
 
     /**
+     *  Set a column with specified type
+     *
      * @param string $type
      * @param string $field
      * @return string
@@ -466,6 +515,8 @@ class Migration
     }
 
     /**
+     *  Add option to column
+     *
      * @param string $option
      * @return string
      */
@@ -475,6 +526,8 @@ class Migration
     }
 
     /**
+     *  Add all of the model properties as columns
+     *
      * @return string
      */
     protected function addColumns()
@@ -507,6 +560,8 @@ class Migration
     }
 
     /**
+     *  Add timestamps to the migration
+     *
      * @return string
      */
     private function addTimestamps()
@@ -530,6 +585,8 @@ class Migration
     }
 
     /**
+     *  Remove columns that were removed from the models definition file
+     *
      * @return string
      */
     private function dropColumns()
@@ -544,6 +601,8 @@ class Migration
     }
 
     /**
+     *  Drop the pivot tables for belongsToMany relationships that were removed
+     *
      * @return string
      */
     private function dropPivotTables()
@@ -563,6 +622,8 @@ class Migration
     }
 
     /**
+     *  Drop foreign key columns
+     *
      * @return string
      */
     private function dropRelationships()
@@ -581,6 +642,8 @@ class Migration
     }
 
     /**
+     *  Add specified properties to the table
+     *
      * @param string $tableName
      * @param array $properties
      * @return string
@@ -599,6 +662,8 @@ class Migration
     }
 
     /**
+     *  Remove the added columns from the table
+     *
      * @param string $tableName
      * @return string
      */
@@ -620,6 +685,8 @@ class Migration
     }
 
     /**
+     *  Generate the migration filename based on the timestamp
+     *
      * @param string $migrationName
      * @param $timestamp
      * @return string $migrationFileName
@@ -673,6 +740,8 @@ class Migration
     }
 
     /**
+     *  For relationships that have been removed, this is the reverse to add them
+     *
      * @param Relation[] $removedRelationships
      * @param string $tableName
      * @return string
@@ -699,6 +768,8 @@ class Migration
     }
 
     /**
+     *  Content to be added for the down migration
+     *
      * @param bool $tableCreated
      * @param string $tableName
      * @return string

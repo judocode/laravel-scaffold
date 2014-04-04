@@ -60,6 +60,8 @@ class Model extends BaseModel
     }
 
     /**
+     *  Generate a model from the specified input
+     *
      * @param $modelAndProperties
      */
     public function generateModel($modelAndProperties)
@@ -80,6 +82,8 @@ class Model extends BaseModel
     }
 
     /**
+     *  Generate properties
+     *
      * @return bool
      */
     public function generateProperties()
@@ -118,6 +122,8 @@ class Model extends BaseModel
     }
 
     /**
+     *  Return the properties that have been removed
+     *
      * @return array
      */
     public function getPropertiesToRemove()
@@ -126,6 +132,8 @@ class Model extends BaseModel
     }
 
     /**
+     *  Return the relationships that have been removed
+     *
      * @return Relation[]
      */
     public function getRelationshipsToRemove()
@@ -134,6 +142,8 @@ class Model extends BaseModel
     }
 
     /**
+     *  Get relationships for the model from input
+     *
      * @param $values
      */
     private function getModelsWithRelationships(&$values)
@@ -230,6 +240,8 @@ class Model extends BaseModel
     }
 
     /**
+     *  Get the namespace of the model
+     *
      * @param $modelWithNamespace
      * @return string
      */
@@ -239,6 +251,8 @@ class Model extends BaseModel
     }
 
     /**
+     *  Get the model name
+     *
      * @param $modelWithNamespace
      */
     private function getModel($modelWithNamespace)
@@ -252,6 +266,8 @@ class Model extends BaseModel
     }
 
     /**
+     *  Check to see if input is the last relation
+     *
      * @param $values
      * @param $next
      * @return bool
@@ -262,6 +278,8 @@ class Model extends BaseModel
     }
 
     /**
+     *  Check to see if the argument is a relation
+     *
      * @param $value
      * @return bool
      */
@@ -271,6 +289,8 @@ class Model extends BaseModel
     }
 
     /**
+     *  Get properties from the specified input
+     *
      * @param $fieldNames
      * @return array|bool
      */
@@ -376,5 +396,4 @@ class Model extends BaseModel
         'timestamp'=>'timestamp',
         'morphs'=>'morphs',
         'bigincrements'=>'bigIncrements');
-
 }
