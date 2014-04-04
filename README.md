@@ -40,6 +40,15 @@ To include the config file within your config folder.
 
 `scaffold:update` searches for changes in the model definitions file (defined in your config file), and updates your models/migrations accordingly.
 
+## Templates
+
+This command utilizes template files, so you can specify the format for your views, controller, repository,
+and tests in a folder called "templates" in your app directory (location provided in your config file -
+defaults to app/templates).
+
+You can also add your own views, as long as the name in the config file corresponds with the name
+of the template within the templates folder.
+
 ## New features
 
 ###Keep a running list of your model definitions
@@ -47,6 +56,16 @@ To include the config file within your config folder.
 There is now a `scaffold:update` command and it is very cool! In your config file, you will have an option
 to specify a "modelDefinitions" file, and in this you will place all of your model definitions. See below
 for an example.
+
+    resource = true
+    namespace = Oxford
+    University hasMany Department string( name city state homepage ) -nt
+    Department belongsTo University, hasMany Course string( name description ) number:integer
+    resource = false
+    Course belongsTo Department, hasMany Lesson string( name description ) integer( number credits ) -sd
+
+ - Resource is whether or not your controller is a resource controller. All controllers will follow what the previous `resource` was set, so you can mix and match.
+ - If namespace is set, then it is applied globally, else you can namespace specific models by prefacing the model ame with the namespace.
 
 When you update this file and run `php artisan scaffold:update` it will check to see what
 has changed and update your models/migrations automatically! It will keep a "cache" file in the
@@ -56,28 +75,9 @@ know if anything has been removed.
 Models, fields, and relationships can be removed from this file and a migration will be automatically
 generated to drop the respective model/field/foreign key, along with updating the model.
 
-###Load models and properties from a file
+### Model syntax
 
-You can now load as many models as you want from one file! Just run the command `php artisan scaffold:file "path/to/file.txt"` where `file.txt` is of the format:
-
-    resource = true
-    namespace = Oxford
-    University hasMany Department string( name city state homepage ) -nt
-    Department belongsTo University, hasMany Course string( name description ) number:integer
-    resource = false
-    Course belongsTo Department, hasMany Lesson string( name description ) integer( number credits )
-
-Where resource is whether or not your controller is a resource controller. All controllers will follow what the previous `resource` was set, so you can mix and match.
-
-If namespace is set, then it is applied globally, else you can namespace specific models by prefacing the name with the namespace.
-
-`-nt` is an option that sets timestamps to false on the particular model.
-
-`-sd` is an option that sets softDelete to true on the particular model.
-
-### Accepted arguments at the add model prompt
-
-Within the command, there is a prompt to ask if you want to add tables, the syntax is simple!
+The syntax for defining models is quite simple. Take a look at some examples:
 
 `Book title:string published:datetime`
 
@@ -99,23 +99,26 @@ You can also add multiple relationships!
 
 `Book belongsTo Author, hasMany Word title:string published:datetime`
 
+There are also several options that you can append to a model:
+
+ - `-nt` is an option that sets timestamps to false on the particular model (they default to true)
+ - `-sd` is an option that sets softDelete to true on the particular model.
+
 Have a lot of properties that are "strings" or "integers" etc? No problem, just group them!
 
 `Book belongsTo Author string( title content description publisher ) published:datetime`
 
 If you are using the above syntax, please strictly adhere to it (for now).
 
-### Video overview of command
+## Video overview of command
 
 Reading is boring... check out this overview: https://www.youtube.com/watch?v=6ESSjdUSNMw
 
-This video is a bit out of date now, but the idea is still the same.
+This video is a bit out of date now (more awesomeness has been added), but the idea is still the same.
 
 ## Additional comments
 
-The seeder now uses faker in order to randomly generate 10 rows in each table. It will try to determine the type, but you can open the seed file to verify. For more information on Faker: https://github.com/fzaninotto/Faker
-
-This now utilizes template files, so you can specify the format for your views, controller, repository, and tests in a folder called "templates" in your app directory.
+The seeder uses faker in order to randomly generate 10 rows in each table. It will try to determine the type, but you can open the seed file to verify. For more information on Faker: https://github.com/fzaninotto/Faker
 
 ## Bonus
 
