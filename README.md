@@ -51,8 +51,10 @@ for an example.
 When you update this file and run `php artisan scaffold:update` it will check to see what
 has changed and update your models/migrations automatically! It will keep a "cache" file in the
 same directory as your models file to track the changes, so DO NOT EDIT IT! This allows the command to
-know if anything has been removed. Fields can be removed and a migration will be automatically generated
-to drop the respective fields. Support to remove relationships is coming soon.
+know if anything has been removed.
+
+Models, fields, and relationships can be removed from this file and a migration will be automatically
+generated to drop the respective model/field/foreign key, along with updating the model.
 
 ###Load models and properties from a file
 
@@ -135,10 +137,16 @@ Then run `laravel project-name` and watch as your application is fully built and
 
 Watch a [demonstration](http://youtu.be/e7otZWQSqrY) on youtube
 
-## Features to be added
+## Features to be added for 1.0 release
 
-- Add command `scaffold:rollback` to remove any files that were created during the last scaffold update.
+- -nv option for no views
+- -m option for migration only ( pivot tables )
+- add field length option ( name:string|40 )
+- on delete restrict/cascade/null
+- remove model/controller/repository/views/seeds/tests if model is removed
+- update model/controller/repository/views/seeds/tests if property is removed
 
 ## Future ideas
 
+- Add command `scaffold:rollback` to remove any files that were created during the last scaffold update.
 - Automatically create js file based on js framework that is specified.
