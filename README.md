@@ -65,7 +65,7 @@ for an example.
     Course belongsTo Department, hasMany Lesson string( name description ) integer( number credits ) -sd
 
  - Resource is whether or not your controller is a resource controller. All controllers will follow what the previous `resource` was set, so you can mix and match.
- - If namespace is set, then it is applied globally, else you can namespace specific models by prefacing the model ame with the namespace.
+ - If namespace is set, then it is applied globally, else you can namespace specific models by prefacing the model name with the namespace.
 
 When you update this file and run `php artisan scaffold:update` it will check to see what
 has changed and update your models/migrations automatically! It will keep a "cache" file in the
