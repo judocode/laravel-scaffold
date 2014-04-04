@@ -1,6 +1,6 @@
 {
     "name": "jrenton/laravel-scaffold",
-    "description": "Automatically generates files for laravel project",
+    "description": "Fastest way to rapidly scaffold a laravel application",
     "keywords": ["laravel", "package", "scaffold", "command"],
     "license": "MIT",
     "authors": [
