@@ -19,6 +19,68 @@ class Relation
     }
 
     /**
+     *  Is the current relation a "belongsTo"
+     *
+     * @return bool
+     */
+    public function isBelongsTo()
+    {
+        return $this->relationType == "belongsto";
+    }
+
+    /**
+     *  Is the current relation a "belongsToMany"
+     *
+     * @return bool
+     */
+    public function isBelongsToMany()
+    {
+        return $this->relationType == "belongstomany";
+    }
+
+    /**
+     *  Return the related models' table name
+     *
+     * @return string
+     */
+    public function getRelatedModelTableName()
+    {
+        return $this->model->getTableName();
+    }
+
+    /**
+     *  Return the foreign key name
+     *
+     * @return string
+     */
+    public function getForeignKeyName()
+    {
+        return $this->model->tableNameLower() . "_id";
+    }
+
+    /**
+     *  Get the name of the pivot table of current relation
+     *   and specified model
+     *
+     * @param Model $model
+     * @return string
+     */
+    public function getPivotTableName(Model $model)
+    {
+        $tableOne = $this->model->lower();
+        $tableTwo = $model->lower();
+
+        if(strcmp($tableOne, $tableTwo) > 1)
+            $tableName = $tableTwo ."_".$tableOne;
+        else
+            $tableName = $tableOne ."_".$tableTwo;
+
+        return $tableName;
+    }
+
+    /**
+     *  Return the "reverse" of relationship
+     *
      * @return array
      */
     public function reverseRelations()
@@ -43,14 +105,18 @@ class Relation
     }
 
     /**
+     *  Return the table name of the relation
+     *
      * @return string
      */
     public function getTableName()
     {
-        return $this->model->upper();
+        return $this->model->plural();
     }
 
     /**
+     *  Return the type of the relation
+     *
      * @return string
      */
     public function getType()
@@ -74,6 +140,8 @@ class Relation
     }
 
     /**
+     *  Get the name of the related or specified model
+     *
      * @param Model $model
      * @param string $type
      * @return string
@@ -103,6 +171,8 @@ class Relation
     }
 
     /**
+     *  Return the name of the relation of the specified model
+     *
      * @param Model $model
      * @param $type
      * @return string

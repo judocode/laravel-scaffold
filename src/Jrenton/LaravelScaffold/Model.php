@@ -14,7 +14,14 @@ class Model extends BaseModel
      */
     private $propertiesStr = "";
 
+    /**
+     * @var array
+     */
     private $propertiesToRemove = array();
+
+    /**
+     * @var array
+     */
     private $propertiesToChange = array();
 
     /**
@@ -27,6 +34,9 @@ class Model extends BaseModel
      */
     private $namespaceGlobal;
 
+    /**
+     * @var array
+     */
     private $oldModelFile;
 
     /**
@@ -35,7 +45,13 @@ class Model extends BaseModel
     public $exists = false;
 
     /**
+     * @var array
+     */
+    private $relationshipsToRemove = array();
+
+    /**
      * @param Command $command
+     * @param array $oldModelFile
      */
     public function __construct(Command $command, $oldModelFile)
     {
@@ -57,9 +73,8 @@ class Model extends BaseModel
 
         $modelWithNamespace = array_shift($this->inputProperties);
 
-        if(!$this->namespaceGlobal) {
+        if(!$this->namespaceGlobal)
             $this->namespace = $this->getNamespaceFromInput($modelWithNamespace);
-        }
 
         $this->getModel($modelWithNamespace);
     }
@@ -69,17 +84,24 @@ class Model extends BaseModel
      */
     public function generateProperties()
     {
-        if( !empty($this->inputProperties) ) {
+        if( !empty($this->inputProperties) )
+        {
             $this->getModelsWithRelationships($this->inputProperties);
 
             $this->propertiesArr = $this->getPropertiesFromInput($this->inputProperties);
 
-            if(array_key_exists($this->getTableName(), $this->oldModelFile)) {
-                if(array_key_exists("properties", $this->oldModelFile[$this->getTableName()])) {
-                    foreach ($this->oldModelFile[$this->getTableName()]["properties"] as $property => $type) {
-                        if(!array_key_exists($property, $this->propertiesArr)) {
-                            $this->propertiesToRemove[] = $property;
-                        } else if($this->oldModelFile[$this->getTableName()]["properties"][$property] != $this->propertiesArr[$property]){
+            if(array_key_exists($this->getTableName(), $this->oldModelFile))
+            {
+                if(array_key_exists("properties", $this->oldModelFile[$this->getTableName()]))
+                {
+                    foreach ($this->oldModelFile[$this->getTableName()]["properties"] as $property => $type)
+                    {
+                        if(!array_key_exists($property, $this->propertiesArr))
+                        {
+                            $this->propertiesToRemove[$property] = $type;
+                        }
+                        else if($this->oldModelFile[$this->getTableName()]["properties"][$property] != $this->propertiesArr[$property])
+                        {
                             $this->propertiesToChange[$property] = $this->propertiesArr[$property];
                         }
                     }
@@ -95,9 +117,20 @@ class Model extends BaseModel
         return true;
     }
 
+    /**
+     * @return array
+     */
     public function getPropertiesToRemove()
     {
         return $this->propertiesToRemove;
+    }
+
+    /**
+     * @return Relation[]
+     */
+    public function getRelationshipsToRemove()
+    {
+        return $this->relationshipsToRemove;
     }
 
     /**
@@ -105,7 +138,8 @@ class Model extends BaseModel
      */
     private function getModelsWithRelationships(&$values)
     {
-        if($this->nextArgumentIsRelation($values[0])) {
+        if($this->nextArgumentIsRelation($values[0]))
+        {
             $relationship = $values[0];
             $relatedTable = trim($values[1], ',');
 
@@ -116,7 +150,8 @@ class Model extends BaseModel
             else
                 $model = $relatedTable;
 
-            if(!$this->namespaceGlobal) {
+            if(!$this->namespaceGlobal)
+            {
                 $namespace = $this->getNamespace($relatedTable);
             }
 
@@ -126,18 +161,25 @@ class Model extends BaseModel
 
             array_push($this->relationship, new Relation($relationship, new BaseModel($model, $namespace)));
 
-            while($i < count($values) && $this->nextArgumentIsRelation($values[$i])) {
-                if(strpos($values[$i], ",") === false) {
+            while($i < count($values) && $this->nextArgumentIsRelation($values[$i]))
+            {
+                if(strpos($values[$i], ",") === false)
+                {
                     $next = $i + 1;
-                    if($this->isLastRelation($values, $next)) {
+                    if($this->isLastRelation($values, $next))
+                    {
                         $relationship = $values[$i];
                         $relatedTable = trim($values[$next], ',');
                         $i++;
                         unset($values[$next]);
-                    } else {
+                    }
+                    else
+                    {
                         $relatedTable = $values[$i];
                     }
-                } else {
+                }
+                else
+                {
                     $relatedTable = trim($values[$i], ',');
                 }
 
@@ -148,7 +190,8 @@ class Model extends BaseModel
                 else
                     $model = $relatedTable;
 
-                if(!$this->namespaceGlobal) {
+                if(!$this->namespaceGlobal)
+                {
                     $namespace = $this->getNamespace($relatedTable);
                 }
 
@@ -159,6 +202,30 @@ class Model extends BaseModel
 
             unset($values[0]);
             unset($values[1]);
+        }
+
+        if(array_key_exists($this->getTableName(), $this->oldModelFile))
+        {
+            if(array_key_exists("relationships", $this->oldModelFile[$this->getTableName()]))
+            {
+                foreach ($this->oldModelFile[$this->getTableName()]["relationships"] as $oldRelation)
+                {
+                    $found = false;
+                    foreach ($this->relationship as $relation)
+                    {
+                        if (isset($relation->model->tableName) && $relation->model->tableName == $oldRelation->model->tableName)
+                        {
+                            $found = true;
+                            break;
+                        }
+                    }
+
+                    if(!$found)
+                    {
+                        array_push($this->relationshipsToRemove, $oldRelation);
+                    }
+                }
+            }
         }
     }
 

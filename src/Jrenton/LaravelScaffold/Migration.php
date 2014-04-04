@@ -10,7 +10,7 @@ class Migration
     /**
      * @var bool
      */
-    private $columnAdded = false;
+    private $columnsChanged = false;
 
     /**
      * @var array
@@ -38,10 +38,14 @@ class Migration
     private $fileCreator;
 
     /**
+     * @var string
+     */
+    private $currentFileContents;
+
+    /**
      * @param string $path
      * @param Model $model
      * @param FileCreator $fileCreator
-     * @internal param $lastTimeStamp
      */
     public function __construct($path, Model $model, FileCreator $fileCreator)
     {
@@ -50,93 +54,73 @@ class Migration
         $this->fileCreator = $fileCreator;
     }
 
-    public function createMigrations(&$lastTimestamp)
+    /**
+     * Create migrations file for the attached model
+     */
+    public function createMigrations(&$timestamp)
     {
         $tableName = $this->model->getTableName();
 
-        $tableCreated = $this->isTableCreated($this->model->getTableName());
+        $isTableCreated = $this->isTableCreated($this->model->getTableName());
 
-        if($tableCreated) {
-            $migrationName = "edit_" . $tableName . "_table";
-        } else {
-            $migrationName = "create_" . $tableName . "_table";
-        }
+        $functionContents = $this->migrationUp($isTableCreated);
 
-        if ($handle = opendir($this->migrationsPath)) {
-            while (false !== ($entry = readdir($handle))) {
-                if ($entry[0] != ".") {
-                    if(strpos($entry, $migrationName) !== false) {
-                        $index = strpos($entry, "_");
-                        $index = strpos($entry, "_", $index+1);
-                        $index = strpos($entry, "_", $index+1);
-                        $index = strpos($entry, "_", $index+1);
+        if($this->columnsChanged)
+        {
+            $migrationName = $isTableCreated ? "edit" : "create";
+            $migrationName .= "_" . $tableName . "_table";
 
-                        $migrationFilename = substr($entry, $index+1, strrpos($entry, ".")-($index+1));
-                        $halfMigration = substr($migrationFilename, 0, strrpos($migrationFilename, "_"));
-                        $lastSegment = substr(strrchr($migrationFilename, "_"), 1);
-                        if(is_numeric($lastSegment)) {
-                            $migrationName = $halfMigration . "_" . ($lastSegment+1);
-                        } else {
-                            $migrationName = $migrationFilename . "_2";
-                        }
-                    }
-                }
-            }
-            closedir($handle);
-        }
+            $migrationFile = $this->getMigrationFileName($migrationName, $timestamp);
 
-        $functionContents = $this->migrationUp($tableCreated);
+            $fileContents = $this->fileCreator->createFunction("up", $functionContents);
 
-        if($this->columnAdded) {
-            if(!$lastTimestamp) {
-                $lastTimestamp['day'] = date("Y_m_d");
-                $lastTimestamp['second'] = date("His");
-            } else {
-                $newTime = $lastTimestamp['second'] + 1;
-                $lastTimestamp['second'] = sprintf('%06d', $newTime);
-            }
+            $functionContents = $this->migrationDownContents($isTableCreated, $tableName);
 
-            $migrationFile = $this->migrationsPath
-                . $lastTimestamp['day'] . "_" . $lastTimestamp['second']
-                . "_" . $migrationName . ".php";
+            $fileContents .= $this->fileCreator->createFunction("down", $functionContents);
 
             $classNameArr = explode("_", $migrationName);
             $className = "";
-            foreach($classNameArr as $class) {
+
+            foreach($classNameArr as $class)
+            {
                 $className .= ucfirst($class);
             }
-            $removedProperties = $this->model->getPropertiesToRemove();
-
-            $fileContents = $this->fileCreator->createFunction("up", $functionContents);
-            if(!$tableCreated) {
-                $functionContents = "\t\tSchema::dropIfExists('".$tableName."');\n";
-            } else {
-                $functionContents = "\t\tSchema::table('".$tableName."', function(Blueprint \$table) {\n";
-
-                if(!empty($this->columnsAdded)) {
-                    $functionContents .="\t\t\t\$table->dropColumn(";
-                    foreach ($this->columnsAdded as $column) {
-                        $functionContents .= "'$column',";
-                    }
-                    $functionContents = rtrim($functionContents, ",");
-                    $functionContents .= ");\n\t\t});\n";
-                } else if (!empty($removedProperties)) {
-                    foreach ($removedProperties as $property => $type) {
-                        $functionContents .= "\t\t\t\$table->$type('$property');\n\t\t});\n";
-                    }
-                }
-
-            }
-
-            $fileContents .= $this->fileCreator->createFunction("down", $functionContents);
 
             $this->fileCreator->createMigrationClass($migrationFile, $fileContents, $className);
         }
     }
 
+    /**
+     * @return array
+     */
     public function getForeignKeys()
     {
         return $this->fillForeignKeys;
+    }
+
+    public function dropTable(&$timestamp)
+    {
+        $migrationName = "edit_" . $this->model->getTableName() . "_table";
+
+        $migrationFile = $this->getMigrationFileName($migrationName, $timestamp);
+
+        $functionContents = "\t\tSchema::dropIfExists('".$this->model->getTableName()."');\n";
+
+        $this->currentFileContents = $this->fileCreator->createFunction("up", $functionContents);
+
+        $functionContents = $this->migrationUp();
+
+        $this->currentFileContents .= $this->fileCreator->createFunction("down", $functionContents);
+
+        $classNameArr = explode("_", $migrationName);
+        $className = "";
+
+        foreach($classNameArr as $class)
+        {
+            $className .= ucfirst($class);
+        }
+
+        $this->fileCreator->createMigrationClass($migrationFile, $this->currentFileContents, $className);
     }
 
     /**
@@ -146,13 +130,16 @@ class Migration
     {
         $content = "";
 
-        if ($this->model->hasSoftDeletes()) {
-            if (!$this->tableHasColumn($this->model->getTableName(), "deleted_at")) {
-                $this->columnAdded = true;
+        if ($this->model->hasSoftDeletes())
+        {
+            if (!$this->tableHasColumn("deleted_at"))
+            {
+                $this->columnsChanged = true;
                 array_push($this->columnsAdded, "deleted_at");
                 $content = "\t\t\t" . $this->setColumn('softDeletes', null) . ";\n";
             }
         }
+
         return $content;
     }
 
@@ -169,7 +156,7 @@ class Migration
         if(!$tableCreated)
             $content .= "\t\t\t" . $this->setColumn('increments', 'id') . ";\n";
 
-        $content .= $this->addColumns($this->model->getTableName());
+        $content .= $this->addColumns();
 
         $content .= $this->addTimestamps();
 
@@ -179,7 +166,14 @@ class Migration
 
         $content .= $this->dropColumns();
 
+        $content .= $this->dropRelationships();
+
         $content .= "\t\t});\n";
+
+        if($this->columnsChanged)
+            $content .= $this->dropPivotTables();
+        else
+            $content = $this->dropPivotTables();
 
         foreach($this->model->getRelationships() as $relation) {
             if($relation->getType() == "belongsToMany") {
@@ -190,7 +184,7 @@ class Migration
                 $tableName = $this->getPivotTableName($tableOne, $tableTwo);
 
                 if(!$this->isTableCreated($tableName)) {
-                    $this->columnAdded = true;
+                    $this->columnsChanged = true;
                     array_push($this->tablesAdded, $tableName);
                     $content .= "\t\tSchema::create('".$tableName."', function(Blueprint \$table) {\n";
                     $content .= "\t\t\t\$table->integer('".$tableOne."_id')->unsigned();\n";
@@ -198,14 +192,14 @@ class Migration
                     $content .= "\t\t});\n";
                 }
             } else if($relation->getType() == "hasOne" || $relation->getType() == "hasMany") {
-                if($this->tableHasColumn($relation->model->getTableName() ,$this->model->lower()."_id")) {
+                if($this->tableHasColumn($this->model->lower()."_id", $relation->model->getTableName())) {
                     if(!$tableCreated) {
                         $content .= "\t\tSchema::table('".$relation->model->getTableName()."', function(Blueprint \$table) {\n";
                         $content .= "\t\t\t\$table->foreign('". $this->model->tableNameLower()."_id')->references('id')->on('".$this->model->getTableName()."');\n";
                         $content .= "\t\t});\n";
                     }
-                } else if($this->isTableCreated($relation->model->getTableName()) && !$this->tableHasColumn($relation->model->getTableName(), $this->model->tableNameLower()."_id")) {
-                    $this->columnAdded = true;
+                } else if($this->isTableCreated($relation->model->getTableName()) && !$this->tableHasColumn($this->model->tableNameLower()."_id", $relation->model->getTableName())) {
+                    $this->columnsChanged = true;
                     $column = $this->model->tableNameLower()."_id";
                     array_push($this->columnsAdded, $column);
                     $content .= "\t\tSchema::table('".$relation->model->getTableName()."', function(Blueprint \$table) {\n";
@@ -219,25 +213,34 @@ class Migration
     }
 
     /**
-     * @param $tableName
-     * @param $columnName
+     * @param string $tableName
+     * @param string $columnName
      * @return bool
      */
-    private function tableHasColumn($tableName, $columnName)
+    private function tableHasColumn($columnName, $tableName = "")
     {
-        if(\Schema::hasColumn($tableName, $columnName)) {
-            return true;
+        if(empty($tableName))
+            $tableName = $this->model->getTableName();
+
+        $search = "/public\s+function\s+up.*Schema::(table|create)\s*\(\s*'$tableName'.*\-\>\s*(?!dropColumn).*\(\s*'$columnName'.*public\s+function\s+down/s";
+        $notDown = "/public\s+function\s+up.*Schema::(table|create)\s*\(\s*'$tableName'.*\-\>\s*dropColumn\s*\(\s*'$columnName'.*public\s+function\s+down/s";
+
+        $found = $this->searchInMigrationFiles($search, $notDown);
+
+        if($found)
+        {
+            $matched = preg_match("/public\s+function\s+up.*Schema::drop\w*\s*\(\s*'$tableName'.*/s", $this->currentFileContents);
+            if($matched > 0)
+                $found = false;
         }
 
-        $search = "/Schema::(table|create).*'$tableName',.*\(.*\).*{.*'$columnName'.*}\);/s";
-
-        return $this->searchInMigrationFiles($search);
+        return $found;
     }
 
     /**
-     * @param $table
-     * @param $column
-     * @param $type
+     * @param string $table
+     * @param string $column
+     * @param string $type
      * @return bool
      */
     public function isColumnOfType($table, $column, $type)
@@ -253,15 +256,16 @@ class Migration
     }
 
     /**
-     * @param $table
-     * @param $column
-     * @param $type
+     * @param string $table
+     * @param string $column
+     * @param string $type
      * @return bool
      * @throws \Exception
      */
     public function isColumnOfTypeInDb($table, $column, $type)
     {
-        switch (\DB::connection()->getConfig('driver')) {
+        switch (\DB::connection()->getConfig('driver'))
+        {
             case 'pgsql':
                 $query = "SELECT column_name FROM information_schema.columns WHERE table_name = '".$table."'";
                 break;
@@ -307,57 +311,49 @@ class Migration
      */
     private function isColumnOfTypeInMigrationFiles($table, $column, $type)
     {
-        $search = "/Schema::(table|create).*'$table',.*\(.*\).*{.*$type\('$column'.*\).*}\);/s";
-        $anotherColumn = "/Schema::(table|create).*'$table',.*\(.*\).*{.*\('$column'.*\).*}\);/s";
+        $search = "/public\s+function\s+up.*Schema::(table|create).*'$table'.*$type\('$column'.*\).*public\s+function\s+down/s";
+        $anotherColumn = "/public\s+function\s+up.*Schema::(table|create).*'$table'.*\('$column'.*\).*public\s+function\s+down/s";
 
-        $found = false;
-
-        if ($handle = opendir($this->migrationsPath)) {
-            while (false !== ($entry = readdir($handle))) {
-                if ($entry[0] != ".") {
-                    $fileName = $this->migrationsPath.$entry;
-
-                    $contents = \File::get($fileName);
-
-                    if(!$found) {
-                        $matched = preg_match($search, $contents);
-
-                        if($matched !== false && $matched != 0)
-                            $found = true;
-                    }
-
-                    if($found) {
-                        $matched = preg_match($anotherColumn, $contents);
-
-                        if($matched !== false && $matched != 0)
-                            $found = false;
-                    }
-                }
-            }
-            closedir($handle);
-        }
-
-        return $found;
+        return $this->searchInMigrationFiles($search, $anotherColumn);
     }
 
     /**
      * @param $search
+     * @param string $fallback
      * @return bool
      */
-    private function searchInMigrationFiles($search)
+    private function searchInMigrationFiles($search, $fallback = "")
     {
         $found = false;
 
-        if ($handle = opendir($this->migrationsPath)) {
-            while (false !== ($entry = readdir($handle))) {
-                if ($entry[0] != ".") {
+        if ($handle = opendir($this->migrationsPath))
+        {
+            while (false !== ($entry = readdir($handle)))
+            {
+                if ($entry[0] != ".")
+                {
                     $fileName = $this->migrationsPath.$entry;
 
                     $contents = \File::get($fileName);
-                    $matched = preg_match($search, $contents);
-                    if($matched !== false && $matched != 0) {
-                        $found = true;
-                        break;
+
+                    if(!$found)
+                    {
+                        $matched = preg_match($search, $contents);
+
+                        if($matched !== false && $matched != 0)
+                        {
+                            $found = true;
+                        }
+                    }
+
+                    if(!empty($fallback) && $found)
+                    {
+                        $matched = preg_match($fallback, $contents);
+
+                        if($matched !== false && $matched != 0)
+                        {
+                            $found = false;
+                        }
                     }
                 }
             }
@@ -377,8 +373,8 @@ class Migration
     );
 
     /**
-     * @param $tableOne
-     * @param $tableTwo
+     * @param string $tableOne
+     * @param string $tableTwo
      * @return string
      */
     private function getPivotTableName($tableOne, $tableTwo)
@@ -392,32 +388,26 @@ class Migration
     }
 
     /**
-     * @param $tableName
+     * @param string $tableName
      * @return bool
      */
     private function isTableCreated($tableName)
     {
-        $found = false;
-        if(\Schema::hasTable($tableName)) {
-            return true;
-        }
+        //$search = "/public\s+function\s+up.*Schema::(table|create)\s*\(\s*'$tableName'.*\-\>\s*(?!dropColumn).*\(\s*'$columnName'.*public\s+function\s+down/s";
+        //$notDown = "/public\s+function\s+up.*Schema::(table|create)\s*\(\s*'$tableName'.*\-\>\s*dropColumn\s*\(\s*'$columnName'.*public\s+function\s+down/s";
 
-        if ($handle = opendir($this->migrationsPath)) {
-            while (false !== ($entry = readdir($handle))) {
-                if ($entry != "." && $entry != "..") {
-                    $fileName = $this->migrationsPath.$entry;
+        $search = "/public\s+function\s+up.*Schema\s*::\s*create\s*\(\s*'$tableName'.*public\s+function\s+down/s";
+        $drop = "/public\s+function\s+up.*Schema\s*::\s*drop\w*\s*\(\s*'$tableName'.*public\s+function\s+down/s";
 
-                    $contents = \File::get($fileName);
-                    if(strpos($contents, "Schema::create('$tableName'") !== false) {
-                        $found = true;
-                        break;
-                    }
-                }
-            }
-            closedir($handle);
-        }
+        $matched = preg_match($drop, $this->currentFileContents);
 
-        return $found;
+        if($matched > 0)
+            return false;
+
+        return $this->searchInMigrationFiles($search, $drop);
+
+        //if(!$found && \Schema::hasTable($tableName))
+        //    return true;
     }
 
     /**
@@ -426,16 +416,27 @@ class Migration
     private function addForeignKeys()
     {
         $fields = "";
-        foreach($this->model->getRelationships() as $relation) {
-            if($relation->getType() == "belongsTo") {
-                $foreignKey = $relation->model->tableNameLower() . "_id";
-                if(!$this->tableHasColumn($this->model->getTableName(), $foreignKey)) {
-                    $this->columnAdded = true;
+
+        foreach($this->model->getRelationships() as $relation)
+        {
+            if($relation->isBelongsTo())
+            {
+                $foreignKey = $relation->getForeignKeyName();
+
+                if(!$this->tableHasColumn($foreignKey))
+                {
+                    $this->columnsChanged = true;
+
                     array_push($this->columnsAdded, $foreignKey);
+
                     $fields .= "\t\t\t" .$this->setColumn('integer', $foreignKey);
+
                     $fields .= $this->addColumnOption('unsigned') . ";\n";
-                    if($this->isTableCreated($relation->model->getTableName())) {
+
+                    if($this->isTableCreated($relation->model->getTableName()))
+                    {
                         $fields .= "\t\t\t\$table->foreign('". $foreignKey."')->references('id')->on('".$relation->model->getTableName()."');\n";
+
                         array_push($this->fillForeignKeys, $foreignKey);
                     }
                 }
@@ -453,7 +454,7 @@ class Migration
     }
 
     /**
-     * @param $type
+     * @param string $type
      * @param string $field
      * @return string
      */
@@ -465,7 +466,7 @@ class Migration
     }
 
     /**
-     * @param $option
+     * @param string $option
      * @return string
      */
     protected function addColumnOption($option)
@@ -474,17 +475,16 @@ class Migration
     }
 
     /**
-     * @param string $tableName
      * @return string
      */
-    protected function addColumns($tableName = "")
+    protected function addColumns()
     {
         $content = '';
 
         foreach( $this->model->getProperties() as $field => $type ) {
 
-            if(!empty($tableName) && !$this->tableHasColumn($tableName, $field)) {
-                $this->columnAdded = true;
+            if(!$this->tableHasColumn($field)) {
+                $this->columnsChanged = true;
                 $rule = "\t\t\t";
 
                 // Primary key check
@@ -512,26 +512,226 @@ class Migration
     private function addTimestamps()
     {
         $content = "";
-        if ($this->model->hasTimestamps()) {
-            if (!$this->tableHasColumn($this->model->getTableName(), "created_at")) {
-                $this->columnAdded = true;
+        if ($this->model->hasTimestamps())
+        {
+            if (!$this->tableHasColumn("created_at"))
+            {
+                $this->columnsChanged = true;
                 $content .= "\t\t\t" . $this->setColumn("timestamp", "created_at") . ";\n";
             }
-            if (!$this->tableHasColumn($this->model->getTableName(), "updated_at")) {
-                $this->columnAdded = true;
+
+            if (!$this->tableHasColumn("updated_at"))
+            {
+                $this->columnsChanged = true;
                 $content .= "\t\t\t" . $this->setColumn("timestamp", "updated_at") . ";\n";
             }
         }
         return $content;
     }
 
+    /**
+     * @return string
+     */
     private function dropColumns()
     {
         $content = "";
-        foreach ($this->model->getPropertiesToRemove() as $property => $type) {
-            $this->columnAdded = true;
+        foreach ($this->model->getPropertiesToRemove() as $property => $type)
+        {
+            $this->columnsChanged = true;
             $content .= "\t\t\t\$table->dropColumn('".$property."');\n";
         }
         return $content;
+    }
+
+    /**
+     * @return string
+     */
+    private function dropPivotTables()
+    {
+        $content = "";
+
+        foreach ($this->model->getRelationshipsToRemove() as $relation)
+        {
+            if($relation->getType() == "belongsToMany")
+            {
+                $this->columnsChanged = true;
+                $content .= "\t\tSchema::dropIfExists('".$relation->getPivotTableName($this->model)."');\n";
+            }
+        }
+
+        return $content;
+    }
+
+    /**
+     * @return string
+     */
+    private function dropRelationships()
+    {
+        $content = "";
+
+        foreach ($this->model->getRelationshipsToRemove() as $relation)
+        {
+            if($relation->getType() != "belongsToMany")
+            {
+                $this->columnsChanged = true;
+                $content .= "\t\t\t\$table->dropColumn('".$relation->getForeignKeyName()."');\n";
+            }
+        }
+        return $content;
+    }
+
+    /**
+     * @param string $tableName
+     * @param array $properties
+     * @return string
+     */
+    private function addPropertiesToTable($tableName, $properties)
+    {
+        $functionContents = "\t\tSchema::table('" . $tableName . "', function(Blueprint \$table) {\n";
+
+        foreach ($properties as $property => $type)
+        {
+            $functionContents .= "\t\t\t\$table->$type('$property');\n";
+        }
+
+        $functionContents .= "\t\t});\n";
+        return $functionContents;
+    }
+
+    /**
+     * @param string $tableName
+     * @return string
+     */
+    private function removePropertiesFromTable($tableName)
+    {
+        $functionContents = "\t\tSchema::table('" . $tableName . "', function(Blueprint \$table) {\n";
+
+        $functionContents .= "\t\t\t\$table->dropColumn(";
+
+        foreach ($this->columnsAdded as $column)
+        {
+            $functionContents .= "'$column',";
+        }
+
+        $functionContents = rtrim($functionContents, ",");
+        $functionContents .= ");\n";
+        $functionContents .= "\t\t});\n";
+        return $functionContents;
+    }
+
+    /**
+     * @param string $migrationName
+     * @param $timestamp
+     * @return string $migrationFileName
+     */
+    private function getMigrationFileName($migrationName, &$timestamp)
+    {
+        if ($handle = opendir($this->migrationsPath))
+        {
+            while (false !== ($entry = readdir($handle)))
+            {
+                if ($entry[0] != ".")
+                {
+                    if(strpos($entry, $migrationName) !== false)
+                    {
+                        $index = strpos($entry, "_");
+                        $index = strpos($entry, "_", $index+1);
+                        $index = strpos($entry, "_", $index+1);
+                        $index = strpos($entry, "_", $index+1);
+
+                        $migrationFilename = substr($entry, $index+1, strrpos($entry, ".")-($index+1));
+                        $halfMigration = substr($migrationFilename, 0, strrpos($migrationFilename, "_"));
+                        $lastSegment = substr(strrchr($migrationFilename, "_"), 1);
+
+                        if(is_numeric($lastSegment))
+                        {
+                            $migrationName = $halfMigration . "_" . ($lastSegment+1);
+                        }
+                        else
+                        {
+                            $migrationName = $migrationFilename . "_2";
+                        }
+                    }
+                }
+            }
+            closedir($handle);
+        }
+
+        if (!$timestamp) {
+            $timestamp['day'] = date("Y_m_d");
+            $timestamp['second'] = date("His");
+        } else {
+            $newTime = $timestamp['second'] + 1;
+            $timestamp['second'] = sprintf('%06d', $newTime);
+        }
+
+        $migrationFileName = $this->migrationsPath
+            . $timestamp['day'] . "_" . $timestamp['second']
+            . "_" . $migrationName . ".php";
+
+        return $migrationFileName;
+    }
+
+    /**
+     * @param Relation[] $removedRelationships
+     * @param string $tableName
+     * @return string
+     */
+    private function rollbackForRemovedProperties($removedRelationships, $tableName)
+    {
+        $functionContents = "";
+        foreach ($removedRelationships as $relation) {
+            if ($relation->getType() == "belongsToMany") {
+                $functionContents .= "\t\tSchema::create('" . $relation->getPivotTableName($this->model) . "', function(Blueprint \$table) {\n";
+                $functionContents .= "\t\t\t\$table->integer('" . $relation->getForeignKeyName() . "')->unsigned();\n";
+                $functionContents .= "\t\t\t\$table->integer('" . $this->model->lower() . "_id')->unsigned();\n";
+                $functionContents .= "\t\t\t\$table->foreign('" . $relation->getForeignKeyName() . "')->references('id')->on('" . $relation->getRelatedModelTableName() . "');\n";
+                $functionContents .= "\t\t\t\$table->foreign('" . $this->model->lower() . "_id')->references('id')->on('" . $this->model->getTableName() . "');\n";
+                $functionContents .= "\t\t});\n";
+            } else {
+                $functionContents .= "\t\tSchema::table('" . $tableName . "', function(Blueprint \$table) {\n";
+                $functionContents .= "\t\t\t\$table->integer('" . $relation->getForeignKeyName() . "')->unsigned();\n";
+                $functionContents .= "\t\t\t\$table->foreign('" . $relation->getForeignKeyName() . "')->references('id')->on('" . $relation->getRelatedModelTableName() . "');\n";
+                $functionContents .= "\t\t});\n";
+            }
+        }
+        return $functionContents;
+    }
+
+    /**
+     * @param bool $tableCreated
+     * @param string $tableName
+     * @return string
+     */
+    private function migrationDownContents($tableCreated, $tableName)
+    {
+        $removedProperties = $this->model->getPropertiesToRemove();
+
+        $functionContents = "";
+
+        if (!$tableCreated)
+        {
+            $functionContents = "\t\tSchema::dropIfExists('" . $tableName . "');\n";
+        }
+        else
+        {
+            if (!empty($this->columnsAdded))
+            {
+                $functionContents = $this->removePropertiesFromTable($tableName);
+            }
+            else if (!empty($removedProperties))
+            {
+                $functionContents = $this->addPropertiesToTable($tableName, $removedProperties);
+            }
+
+            $removedRelationships = $this->model->getRelationshipsToRemove();
+
+            if (!empty($removedRelationships))
+            {
+                $functionContents = $this->rollbackForRemovedProperties($removedRelationships, $tableName);
+            }
+        }
+
+        return $functionContents;
     }
 }

@@ -57,7 +57,7 @@ class Scaffold
     protected $command;
 
     /**
-     * @var
+     * @var string
      */
     private $templatePathWithControllerType;
 
@@ -86,6 +86,13 @@ class Scaffold
      */
     private $lastTimeStamp = array();
 
+    /**
+     *  Stores the current collection of models
+     *
+     * @var array
+     */
+    private $models = array();
+
     public function __construct(Command $command)
     {
         $this->configSettings = $this->getConfigSettings();
@@ -94,6 +101,11 @@ class Scaffold
         $this->assetDownloader = new AssetDownloader($command, $this->configSettings, $this->fileCreator);
     }
 
+    /**
+     * Load user's config settings
+     *
+     * @return array
+     */
     private function getConfigSettings()
     {
         $package = "laravel-scaffold";
@@ -102,10 +114,13 @@ class Scaffold
 
         $configSettings['pathTo'] = \Config::get("$package::paths");
 
-        foreach($configSettings['pathTo'] as $pathName => $path) {
-            if($path[strlen($path)-1] != "/") {
+        foreach($configSettings['pathTo'] as $pathName => $path)
+        {
+            if($path[strlen($path)-1] != "/")
+            {
                 if($pathName != "layout")
                     $path .= "/";
+
                 $configSettings['pathTo'][$pathName] = $path;
             }
         }
@@ -127,6 +142,9 @@ class Scaffold
         return $configSettings;
     }
 
+    /**
+     *  Prompt for and save models from the command line
+     */
     public function createModels()
     {
         $this->fromFile = false;
@@ -139,8 +157,8 @@ class Scaffold
 
         $moreTables = trim($modelAndProperties) == "q" ? false : true;
 
-        while( $moreTables ) {
-
+        while( $moreTables )
+        {
             $this->saveModelAndProperties($modelAndProperties, array());
 
             $this->isResource = $this->command->confirm('Do you want resource (y) or restful (n) controllers? ');
@@ -157,11 +175,19 @@ class Scaffold
         }
     }
 
+    /**
+     *  Generate the layout and download js/css files
+     */
     public function createLayout()
     {
         $this->assetDownloader->generateLayoutFiles();
     }
 
+    /**
+     *  Generate models from a file
+     *
+     * @param $fileName
+     */
     public function createModelsFromFile($fileName)
     {
         $this->fileCreator->fromFile = true;
@@ -177,6 +203,9 @@ class Scaffold
         $this->addAllModelsFromFile($inputFile);
     }
 
+    /**
+     *
+     */
     public function setupLayoutFiles()
     {
         $this->laravelClasses = $this->getLaravelClassNames();
@@ -184,6 +213,9 @@ class Scaffold
         $this->copyTemplateFiles();
     }
 
+    /**
+     *  Update any changes made to model definitions file
+     */
     public function update()
     {
         $this->fileCreator->fromFile = true;
@@ -197,24 +229,35 @@ class Scaffold
         $this->addAllModelsFromFile($inputFile);
     }
 
+    /**
+     *  Add and save all models from specified file
+     *
+     * @param $inputFile
+     */
     public function addAllModelsFromFile($inputFile)
     {
         $oldModelFile = array();
 
-        if(\File::exists($this->getModelCacheFile())) {
+        // Get the cached model definitions file to compare against
+        if(\File::exists($this->getModelCacheFile()))
+        {
             $cachedFile = file($this->getModelCacheFile());
-            $oldModelFile = $this->readInputFile($cachedFile, false);
+            $oldModelFile = $this->getCachedModels($cachedFile, false);
         }
 
-        foreach( $inputFile as $line_num => $modelAndProperties ) {
+        // Loop through the file and create all associated files
+        foreach( $inputFile as $line_num => $modelAndProperties )
+        {
             $modelAndProperties = trim($modelAndProperties);
             if(!empty($modelAndProperties)) {
-                if(preg_match("/^resource =/", $modelAndProperties)) {
+                if(preg_match("/^resource =/", $modelAndProperties))
+                {
                     $this->isResource = trim(substr($modelAndProperties, strpos($modelAndProperties, "=")+1));
                     continue;
                 }
 
-                if(preg_match("/^namespace =/", $modelAndProperties)) {
+                if(preg_match("/^namespace =/", $modelAndProperties))
+                {
                     $this->namespaceGlobal = true;
                     $this->namespace = trim(substr($modelAndProperties, strpos($modelAndProperties, "=")+1));
                     $this->fileCreator->namespace = $this->namespace;
@@ -227,34 +270,58 @@ class Scaffold
             }
         }
 
+        // If any models existed in the cached file,
+        // and not in the current file, drop that table
+        foreach ($oldModelFile as $tableName => $modelData)
+        {
+            if(!array_key_exists($tableName, $this->models))
+            {
+                $migration = new Migration($this->configSettings['pathTo']['migrations'], $modelData['model'], $this->fileCreator);
+                $migration->dropTable($this->lastTimeStamp);
+            }
+        }
+
         copy($this->configSettings['modelDefinitionsFile'], $this->getModelCacheFile());
     }
 
-    public function readInputFile($inputFile, $createFiles = true)
+    /**
+     *  Get all of the cached models from the specified file
+     *
+     * @param $inputFile
+     * @param bool $createFiles
+     * @return array
+     */
+    public function getCachedModels($inputFile, $createFiles = true)
     {
         $oldModelFile = array();
 
-        foreach( $inputFile as $line_num => $modelAndProperties ) {
+        foreach( $inputFile as $line_num => $modelAndProperties )
+        {
             $modelAndProperties = trim($modelAndProperties);
-            if(!empty($modelAndProperties)) {
-                if(preg_match("/^resource =/", $modelAndProperties)) {
+            if(!empty($modelAndProperties))
+            {
+                if(preg_match("/^resource =/", $modelAndProperties))
+                {
                     $this->isResource = trim(substr($modelAndProperties, strpos($modelAndProperties, "=")+1));
                     continue;
                 }
 
-                if(preg_match("/^namespace =/", $modelAndProperties)) {
+                if(preg_match("/^namespace =/", $modelAndProperties))
+                {
                     $this->namespaceGlobal = true;
                     $this->namespace = trim(substr($modelAndProperties, strpos($modelAndProperties, "=")+1));
                     $this->fileCreator->namespace = $this->namespace;
                     continue;
                 }
 
-                $this->saveModelAndProperties($modelAndProperties, array());
+                $this->saveModelAndProperties($modelAndProperties, array(), false);
 
                 $oldModelFile[$this->model->getTableName()] = array();
 
                 $oldModelFile[$this->model->getTableName()]['relationships'] = $this->model->getRelationships();
                 $oldModelFile[$this->model->getTableName()]['properties'] = $this->model->getProperties();
+                $oldModelFile[$this->model->getTableName()]['model'] = $this->model;
+
 
                 if($createFiles)
                     $this->createFiles();
@@ -264,26 +331,44 @@ class Scaffold
         return $oldModelFile;
     }
 
+    /**
+     *  Get the laravel class names to check for collisions
+     *
+     * @return array
+     */
     private function getLaravelClassNames()
     {
         $classNames = array();
 
         $aliases = \Config::get('app.aliases');
-        foreach ($aliases as $alias => $facade) {
+
+        foreach ($aliases as $alias => $facade)
+        {
             array_push($classNames, strtolower($alias));
         }
 
         return $classNames;
     }
 
-    private function saveModelAndProperties($modelAndProperties, $oldModelFile)
+    /**
+     *  Save the model and its properties
+     *
+     * @param $modelAndProperties
+     * @param $oldModelFile
+     * @param bool $storeInArray
+     */
+    private function saveModelAndProperties($modelAndProperties, $oldModelFile, $storeInArray = true)
     {
         do {
             $this->model = new Model($this->command, $oldModelFile);
 
             $this->model->generateModel($modelAndProperties);
 
-            if(!$this->namespaceGlobal) {
+            if($storeInArray)
+                $this->models[$this->model->getTableName()] = $this->model;
+
+            if(!$this->namespaceGlobal)
+            {
                 $this->fileCreator->namespace = $this->model->getNamespace();
                 $this->namespace = $this->model->getNamespace();
             }
@@ -294,7 +379,8 @@ class Scaffold
 
         $propertiesGenerated = $this->model->generateProperties();
 
-        if(!$propertiesGenerated) {
+        if(!$propertiesGenerated)
+        {
             if($this->fromFile)
                 exit;
             else
@@ -302,11 +388,21 @@ class Scaffold
         }
     }
 
+    /**
+     *  Add the current model to the model definitions file
+     *
+     * @param $modelAndProperties
+     */
     private function addToModelDefinitions($modelAndProperties)
     {
         \File::append($this->getModelCacheFile(), "\n" . $modelAndProperties);
     }
 
+    /**
+     *  Gets the model cache file as it relates to the model definitions file
+     *
+     * @return string
+     */
     private function getModelCacheFile()
     {
         $file = $this->configSettings['modelDefinitionsFile'];
@@ -317,6 +413,9 @@ class Scaffold
         return $modelDefinitionsFile;
     }
 
+    /**
+     *  Creates all of the files
+     */
     private function createFiles()
     {
         $this->createModel();
@@ -327,14 +426,16 @@ class Scaffold
 
         $this->runMigrations();
 
-        if(!$this->onlyMigration && $this->columnAdded) {
-
+        if(!$this->onlyMigration && $this->columnAdded)
+        {
             $this->controllerType = $this->getControllerType();
 
             $this->templatePathWithControllerType = $this->configSettings['pathTo']['templates'] . $this->controllerType ."/";
 
-            if(!$this->model->exists) {
-                if($this->configSettings['useRepository']) {
+            if(!$this->model->exists)
+            {
+                if($this->configSettings['useRepository'])
+                {
                     $this->createRepository();
                     $this->createRepositoryInterface();
                     $this->putRepositoryFolderInStartFiles();
@@ -353,11 +454,15 @@ class Scaffold
         }
     }
 
+    /**
+     * Creates the model file
+     */
     private function createModel()
     {
         $fileName = $this->configSettings['pathTo']['models'] . $this->nameOf("modelName") . ".php";
 
-        if(\File::exists($fileName)) {
+        if(\File::exists($fileName))
+        {
             $this->updateModel($fileName);
             $this->model->exists = true;
             return;
@@ -386,22 +491,33 @@ class Scaffold
 
         $this->makeFileFromTemplate($fileName, $this->configSettings['pathTo']['templates'].$template, $fileContents);
 
-        $this->updateLayoutFile();
+        $this->addModelLinksToLayoutFile();
     }
 
+    /**
+     *  Updates an existing model file
+     *
+     * @param $fileName
+     */
     private function updateModel($fileName)
     {
         $fileContents = \File::get($fileName);
 
-        $fileContents = $this->addRelationships($fileContents, false) . "\n}";
+        $fileContents = trim($this->addRelationships($fileContents, false));
+
+        $fileContents = trim($this->removeRelationships($fileContents)) . "\n}\n";
 
         \File::put($fileName, $fileContents);
     }
 
-    private function updateLayoutFile()
+    /**
+     *  Adds model links to the layout file
+     */
+    private function addModelLinksToLayoutFile()
     {
         $layoutFile = $this->configSettings['pathTo']['layout'];
-        if(\File::exists($layoutFile)) {
+        if(\File::exists($layoutFile))
+        {
             $layout = \File::get($layoutFile);
 
             $layout = str_replace("<!--[linkToModels]-->", "<a href=\"{{ url('".$this->nameOf("viewFolder")."') }}\" class=\"list-group-item\">".$this->model->upper()."</a>\n<!--[linkToModels]-->", $layout);
@@ -411,6 +527,8 @@ class Scaffold
     }
 
     /**
+     *  Add relationships to the model
+     *
      * @param $fileContents
      * @param $newModel
      * @return string
@@ -466,16 +584,52 @@ class Scaffold
         return $fileContents;
     }
 
+    /**
+     *  Remove relationships from the model
+     *
+     * @param $fileContents
+     * @return string
+     */
+    private function removeRelationships($fileContents)
+    {
+        foreach ($this->model->getRelationshipsToRemove() as $relation)
+        {
+            $name = $relation->getName();
+
+            if(strpos($fileContents, $name) !== false)
+            {
+                $fileContents = preg_replace("/public\s+function\s+$name\s*\(.*?\).*?\{.*?\}/s", "", $fileContents);
+            }
+        }
+        return $fileContents;
+    }
+
+    /**
+     *  Get controller type, either resource or restful
+     *
+     * @return string
+     */
     private function getControllerType()
     {
         return $this->isResource ? "resource" : "restful";
     }
 
+    /**
+     *  Gets the name from the configuration file
+     *
+     * @param string $type
+     * @return string
+     */
     private function nameOf($type)
     {
         return $this->replaceModels($this->configSettings['names'][$type]);
     }
 
+    /**
+     *  Prompt user for model and properties and return result
+     *
+     * @return string
+     */
     private function askForModelAndFields()
     {
         $modelAndFields = $this->command->ask('Add model with its relations and fields or type "q" to quit (type info for examples) ');
@@ -489,6 +643,9 @@ class Scaffold
         return $modelAndFields;
     }
 
+    /**
+     *  Copy template files from package folder to specified user folder
+     */
     private function copyTemplateFiles()
     {
         if(!\File::isDirectory($this->configSettings['pathTo']['templates'])) {
@@ -496,6 +653,9 @@ class Scaffold
         }
     }
 
+    /**
+     *  Show the examples of the syntax to be used to add models
+     */
     private function showInformation()
     {
         $this->command->info('MyNamespace\Book title:string year:integer');
@@ -504,6 +664,9 @@ class Scaffold
         $this->command->info('Or group like properties: University hasMany Department string( name city state homepage )');
     }
 
+    /**
+     *  Prompt user to run the migrations
+     */
     private function runMigrations()
     {
         if(!$this->fromFile) {
@@ -528,6 +691,9 @@ class Scaffold
         }
     }
 
+    /**
+     *  Generate the seeds file
+     */
     private function createSeeds()
     {
         $faker = Factory::create();
@@ -635,6 +801,8 @@ class Scaffold
     }
 
     /**
+     *  Create the repository interface
+     *
      * @return array
      */
     private function createRepositoryInterface()
@@ -661,6 +829,8 @@ class Scaffold
     }
 
     /**
+     *  Create the repository
+     *
      * @return array
      */
     private function createRepository()
@@ -673,6 +843,8 @@ class Scaffold
     }
 
     /**
+     *  Add repository folder so that it autoloads
+     *
      * @return mixed
      */
     private function putRepositoryFolderInStartFiles()
@@ -698,6 +870,8 @@ class Scaffold
     }
 
     /**
+     *  Create controller
+     *
      * @return array
      */
     private function createController()
@@ -708,6 +882,8 @@ class Scaffold
     }
 
     /**
+     *  Create tests
+     *
      * @return array
      */
     private function createTests()
@@ -720,6 +896,8 @@ class Scaffold
     }
 
     /**
+     *  Update routes file with new controller
+     *
      * @return string
      */
     private function updateRoutes()
@@ -743,6 +921,9 @@ class Scaffold
         }
     }
 
+    /**
+     *  Create views as specified in the configuration file
+     */
     private function createViews()
     {
         $dir = $this->configSettings['pathTo']['views'] . $this->nameOf('viewFolder') . "/";
@@ -762,6 +943,13 @@ class Scaffold
         }
     }
 
+    /**
+     *  Generate a file based off of a template
+     *
+     * @param $fileName
+     * @param $template
+     * @param string $content
+     */
     public function makeFileFromTemplate($fileName, $template, $content = "")
     {
         try {
@@ -788,6 +976,12 @@ class Scaffold
         $this->fileCreator->createFile($fileName, $fileContents);
     }
 
+    /**
+     *  Replace [model] tags in template with the model name
+     *
+     * @param $fileContents
+     * @return mixed
+     */
     private function replaceModels($fileContents)
     {
         $modelReplaces = array('[model]'=>$this->model->lower(), '[Model]'=>$this->model->upper(), '[models]'=>$this->model->plural(), '[Models]'=>$this->model->upperPlural());
@@ -798,6 +992,12 @@ class Scaffold
         return $fileContents;
     }
 
+    /**
+     *  Replace 'names' from the config file with their names
+     *
+     * @param $fileContents
+     * @return mixed
+     */
     public function replaceNames($fileContents)
     {
         foreach($this->configSettings['names'] as $name => $text) {
@@ -807,6 +1007,12 @@ class Scaffold
         return $fileContents;
     }
 
+    /**
+     *  Replace [property] with model's properties
+     *
+     * @param $fileContents
+     * @return mixed
+     */
     private function replaceProperties($fileContents)
     {
         $lastPos = 0;
