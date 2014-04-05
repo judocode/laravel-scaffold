@@ -122,8 +122,8 @@ class AssetDownloader
 
                 $this->downloadAsset("underscore", "http://underscorejs.org/underscore-min.js");
                 $this->downloadAsset("handlebars", "http://builds.handlebarsjs.com.s3.amazonaws.com/handlebars-v1.3.0.js");
-                $this->downloadAsset("angular", "https://ajax.googleapis.com/ajax/libs/angularjs/1.2.12/angular.min.js");
-                $this->downloadAsset("ember", "http://builds.emberjs.com/tags/v1.4.0/ember.min.js");
+                $this->downloadAsset("angular", "https://ajax.googleapis.com/ajax/libs/angularjs/1.2.16/angular.min.js");
+                $this->downloadAsset("ember", "http://builds.emberjs.com/tags/v1.5.0/ember.min.js");
                 $this->downloadAsset("backbone", "http://backbonejs.org/backbone-min.js");
 
                 \File::put($layoutPath, $this->fileContents);
@@ -139,7 +139,7 @@ class AssetDownloader
     {
         if( $this->configSettings['downloads']['bootstrap'] )
         {
-            $ch = curl_init("https://github.com/twbs/bootstrap/releases/download/v3.1.0/bootstrap-3.1.0-dist.zip");
+            $ch = curl_init("https://github.com/twbs/bootstrap/releases/download/v3.1.1/bootstrap-3.1.1-dist.zip");
             $fp = fopen("public/bootstrap.zip", "w");
 
             curl_setopt($ch, CURLOPT_FILE, $fp);
@@ -202,7 +202,7 @@ class AssetDownloader
         }
         else if($this->configSettings['downloads']['foundation'])
         {
-            $ch = curl_init("http://foundation.zurb.com/cdn/releases/foundation-5.1.1.zip");
+            $ch = curl_init("http://foundation.zurb.com/cdn/releases/foundation-5.2.2.zip");
             $fp = fopen("public/foundation.zip", "w");
 
             curl_setopt($ch, CURLOPT_FILE, $fp);
