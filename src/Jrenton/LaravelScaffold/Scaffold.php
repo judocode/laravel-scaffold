@@ -249,7 +249,8 @@ class Scaffold
         foreach( $inputFile as $line_num => $modelAndProperties )
         {
             $modelAndProperties = trim($modelAndProperties);
-            if(!empty($modelAndProperties)) {
+            if(!empty($modelAndProperties))
+            {
                 if(preg_match("/^resource =/", $modelAndProperties))
                 {
                     $this->isResource = trim(substr($modelAndProperties, strpos($modelAndProperties, "=")+1));
@@ -360,7 +361,10 @@ class Scaffold
     private function saveModelAndProperties($modelAndProperties, $oldModelFile, $storeInArray = true)
     {
         do {
-            $this->model = new Model($this->command, $oldModelFile);
+            if(!$this->namespaceGlobal)
+                $this->namespace = "";
+
+            $this->model = new Model($this->command, $oldModelFile, $this->namespace);
 
             $this->model->generateModel($modelAndProperties);
 
@@ -422,11 +426,11 @@ class Scaffold
 
         $this->migration = new Migration($this->configSettings['pathTo']['migrations'], $this->model, $this->fileCreator);
 
-        $this->migration->createMigrations($this->lastTimeStamp);
+        $tableCreated = $this->migration->createMigrations($this->lastTimeStamp);
 
         $this->runMigrations();
 
-        if(!$this->onlyMigration && $this->columnAdded)
+        if(!$this->onlyMigration && $tableCreated)
         {
             $this->controllerType = $this->getControllerType();
 
@@ -535,11 +539,11 @@ class Scaffold
      */
     private function addRelationships($fileContents, $newModel = true)
     {
-        if(!$newModel) {
+        if(!$newModel)
             $fileContents = substr($fileContents, 0, strrpos($fileContents, "}"));
-        }
 
-        foreach ($this->model->getRelationships() as $relation) {
+        foreach ($this->model->getRelationships() as $relation)
+        {
             $relatedModel = $relation->model;
 
             if(strpos($fileContents, $relation->getName()) !== false && !$newModel)
@@ -550,11 +554,14 @@ class Scaffold
 
             $relatedModelFile = $this->configSettings['pathTo']['models'] . $relatedModel->upper() . '.php';
 
-            if (!\File::exists($relatedModelFile)) {
+            if (!\File::exists($relatedModelFile))
+            {
                 if ($this->fromFile)
                     continue;
-                else {
+                else
+                {
                     $editRelatedModel = $this->command->confirm("Model " . $relatedModel->upper() . " doesn't exist yet. Would you like to create it now [y/n]? ", true);
+
                     if ($editRelatedModel)
                         $this->fileCreator->createClass($relatedModelFile, "", array('name' => "\\Eloquent"));
                     else
@@ -563,13 +570,13 @@ class Scaffold
             }
 
             $content = \File::get($relatedModelFile);
-            if (preg_match("/function " . $this->model->lower() . "/", $content) !== 1 && preg_match("/function " . $this->model->plural() . "/", $content) !== 1) {
+            if (preg_match("/function " . $this->model->lower() . "/", $content) !== 1 && preg_match("/function " . $this->model->plural() . "/", $content) !== 1)
+            {
                 $index = 0;
                 $reverseRelations = $relation->reverseRelations();
 
-                if (count($reverseRelations) > 1) {
+                if (count($reverseRelations) > 1)
                     $index = $this->command->ask($relatedModel->upper() . " (0=" . $reverseRelations[0] . " OR 1=" . $reverseRelations[1] . ") " . $this->model->upper() . "? ");
-                }
 
                 $reverseRelationType = $reverseRelations[$index];
                 $reverseRelationName = $relation->getReverseName($this->model, $reverseRelationType);
@@ -634,7 +641,8 @@ class Scaffold
     {
         $modelAndFields = $this->command->ask('Add model with its relations and fields or type "q" to quit (type info for examples) ');
 
-        if($modelAndFields == "info") {
+        if($modelAndFields == "info")
+        {
             $this->showInformation();
 
             $modelAndFields = $this->command->ask('Now your turn: ');
@@ -648,9 +656,8 @@ class Scaffold
      */
     private function copyTemplateFiles()
     {
-        if(!\File::isDirectory($this->configSettings['pathTo']['templates'])) {
+        if(!\File::isDirectory($this->configSettings['pathTo']['templates']))
             $this->fileCreator->copyDirectory("vendor/jrenton/laravel-scaffold/src/Jrenton/LaravelScaffold/templates/", $this->configSettings['pathTo']['templates']);
-        }
     }
 
     /**
@@ -669,19 +676,27 @@ class Scaffold
      */
     private function runMigrations()
     {
-        if(!$this->fromFile) {
+        if(!$this->fromFile)
+        {
             $editMigrations = $this->command->confirm('Would you like to edit your migrations file before running it [y/n]? ', true);
 
-            if ($editMigrations) {
+            if ($editMigrations)
+            {
                 $this->command->info('Remember to run "php artisan migrate" after editing your migration file');
                 $this->command->info('And "php artisan db:seed" after editing your seed file');
-            } else {
-                while (true) {
-                    try {
+            }
+            else
+            {
+                while (true)
+                {
+                    try
+                    {
                         $this->command->call('migrate');
                         $this->command->call('db:seed');
                         break;
-                    } catch (\Exception $e) {
+                    }
+                    catch (\Exception $e)
+                    {
                         $this->command->info('Error: ' . $e->getMessage());
                         $this->command->error('This table already exists and/or you have duplicate migration files.');
                         $this->command->confirm('Fix the error and enter "yes" ', true);
@@ -700,7 +715,8 @@ class Scaffold
 
         $databaseSeeder = $this->configSettings['pathTo']['seeds'] . 'DatabaseSeeder.php';
         $databaseSeederContents = \File::get($databaseSeeder);
-        if(preg_match("/faker/", $databaseSeederContents) !== 1) {
+        if(preg_match("/faker/", $databaseSeederContents) !== 1)
+        {
             $contentBefore = substr($databaseSeederContents, 0, strpos($databaseSeederContents, "{"));
             $contentAfter = substr($databaseSeederContents, strpos($databaseSeederContents, "{")+1);
 
@@ -722,28 +738,36 @@ class Scaffold
 
         $functionContent .= "\t\t\t\$".$this->model->lower()." = array(\n";
 
-        foreach($this->model->getProperties() as $property => $type) {
+        foreach($this->model->getProperties() as $property => $type)
+        {
 
-            if($property == "password") {
+            if($property == "password")
                 $functionContent .= "\t\t\t\t'$property' => \\Hash::make('password'),\n";
-            } else {
+            else
+            {
                 $fakerProperty = "";
-                try {
-
+                try
+                {
                     $fakerProperty2 = $faker->getFormatter($property);
                     $fakerProperty = $property;
-                } catch (\InvalidArgumentException $e) { }
+                }
+                catch (\InvalidArgumentException $e) { }
 
-                if(empty($fakerProperty)) {
-                    try {
+                if(empty($fakerProperty))
+                {
+                    try
+                    {
                         $fakerProperty2 = $faker->getFormatter($type);
                         $fakerProperty = $type;
-                    } catch (\InvalidArgumentException $e) { }
+                    }
+                    catch (\InvalidArgumentException $e) { }
                 }
 
-                if(empty($fakerProperty)) {
+                if(empty($fakerProperty))
+                {
                     $fakerType = "";
-                    switch($type) {
+                    switch($type)
+                    {
                         case "integer":
                         case "biginteger":
                         case "smallinteger":
@@ -765,18 +789,17 @@ class Scaffold
                     }
 
                     $fakerType = $fakerType ? "\$faker->".$fakerType : "0";
-                } else {
-                    $fakerType = "\$faker->".$fakerProperty;
                 }
+                else
+                    $fakerType = "\$faker->".$fakerProperty;
 
                 $functionContent .= "\t\t\t\t'$property' => $fakerType,\n";
 
             }
         }
 
-        foreach($this->migration->getForeignKeys() as $key) {
+        foreach($this->migration->getForeignKeys() as $key)
             $functionContent .= "\t\t\t\t'$key' => \$i,\n";
-        }
 
         $functionContent .= "\t\t\t);\n";
 
@@ -794,7 +817,9 @@ class Scaffold
         $tableSeederClassName = $this->model->upperPlural() . 'TableSeeder';
 
         $content = \File::get($databaseSeeder);
-        if(preg_match("/$tableSeederClassName/", $content) !== 1) {
+
+        if(preg_match("/$tableSeederClassName/", $content) !== 1)
+        {
             $content = preg_replace("/(run\(\).+?)}/us", "$1\t\$this->call('{$tableSeederClassName}');\n\t}", $content);
             \File::put($databaseSeeder, $content);
         }
@@ -815,7 +840,8 @@ class Scaffold
 
         $repoTemplate = $this->configSettings['pathTo']['templates']."repository-interface";
 
-        if($useBaseRepository) {
+        if($useBaseRepository)
+        {
             if(!file_exists($baseRepository))
                 $this->makeFileFromTemplate($baseRepository, $this->configSettings['pathTo']['templates']."base-repository-interface.txt");
             $repoTemplate .= "-with-base";
@@ -857,12 +883,14 @@ class Scaffold
             $startRepo = "app_path().'".substr($repositories, strpos($repositories, "/"), strlen($repositories) - strpos($repositories, "/"))."'";
 
         $content = \File::get('app/start/global.php');
+
         if (preg_match("/repositories/", $content) !== 1)
             $content = preg_replace("/app_path\(\).'\/controllers',/", "app_path().'/controllers',\n\t$startRepo,", $content);
 
         \File::put('app/start/global.php', $content);
 
         $content = \File::get('composer.json');
+
         if (preg_match("/repositories/", $content) !== 1)
             $content = preg_replace("/\"app\/controllers\",/", "\"app/controllers\",\n\t\t\t\"$repositories\",", $content);
 
@@ -916,9 +944,8 @@ class Scaffold
         $fileContents .= "Route::" . $routeType . "('" . $this->nameOf("viewFolder") . "', '" . $namespace. $this->nameOf("controller") ."');\n";
 
         $content = \File::get($routeFile);
-        if (preg_match("/" . $this->model->lower() . "/", $content) !== 1) {
+        if (preg_match("/" . $this->model->lower() . "/", $content) !== 1)
             \File::append($routeFile, $fileContents);
-        }
     }
 
     /**
@@ -932,12 +959,16 @@ class Scaffold
 
         $pathToViews = $this->configSettings['pathTo']['templates'].$this->controllerType."/";
 
-        foreach($this->configSettings['views'] as $view) {
+        foreach($this->configSettings['views'] as $view)
+        {
             $fileName = $dir . "$view.blade.php";
 
-            try{
+            try
+            {
                 $this->makeFileFromTemplate($fileName, $pathToViews."$view.txt");
-            } catch(FileNotFoundException $e) {
+            }
+            catch(FileNotFoundException $e)
+            {
                 $this->command->error("Template file ".$pathToViews . $view.".txt does not exist! You need to create it to generate that file!");
             }
         }
@@ -952,26 +983,29 @@ class Scaffold
      */
     public function makeFileFromTemplate($fileName, $template, $content = "")
     {
-        try {
+        try
+        {
             $fileContents = \File::get($template);
-        } catch(FileNotFoundException $e) {
+        }
+        catch(FileNotFoundException $e)
+        {
             $shortTemplate = substr($template, strpos($template, $this->configSettings["pathTo"]["templates"]) + strlen($this->configSettings["pathTo"]["templates"]),strlen($template)-strlen($this->configSettings["pathTo"]["templates"]));
             $this->fileCreator->copyFile("vendor/jrenton/laravel-scaffold/src/Jrenton/LaravelScaffold/templates/".$shortTemplate, $template);
             $fileContents = \File::get($template);
         }
+
         $fileContents = $this->replaceNames($fileContents);
         $fileContents = $this->replaceModels($fileContents);
         $fileContents = $this->replaceProperties($fileContents);
-        if($content) {
+
+        if($content)
             $fileContents = str_replace("[content]", $content, $fileContents);
-        }
 
         $namespace = $this->namespace ? "namespace ".$this->namespace. ";" : "";
         $fileContents = str_replace("[namespace]", $namespace, $fileContents);
 
-        if(!$this->configSettings['useRepository']) {
+        if(!$this->configSettings['useRepository'])
             $fileContents = str_replace($this->nameOf("repositoryInterface"), $this->nameOf("modelName"), $fileContents);
-        }
 
         $this->fileCreator->createFile($fileName, $fileContents);
     }
@@ -985,9 +1019,9 @@ class Scaffold
     private function replaceModels($fileContents)
     {
         $modelReplaces = array('[model]'=>$this->model->lower(), '[Model]'=>$this->model->upper(), '[models]'=>$this->model->plural(), '[Models]'=>$this->model->upperPlural());
-        foreach($modelReplaces as $model => $name) {
+
+        foreach($modelReplaces as $model => $name)
             $fileContents = str_replace($model, $name, $fileContents);
-        }
 
         return $fileContents;
     }
@@ -1000,9 +1034,8 @@ class Scaffold
      */
     public function replaceNames($fileContents)
     {
-        foreach($this->configSettings['names'] as $name => $text) {
+        foreach($this->configSettings['names'] as $name => $text)
             $fileContents = str_replace("[$name]", $text, $fileContents);
-        }
 
         return $fileContents;
     }
@@ -1019,7 +1052,8 @@ class Scaffold
         $needle = "[repeat]";
         $endRepeat = "[/repeat]";
 
-        while (($lastPos = strpos($fileContents, $needle, $lastPos))!== false) {
+        while (($lastPos = strpos($fileContents, $needle, $lastPos))!== false)
+        {
             $beginning = $lastPos;
             $lastPos = $lastPos + strlen($needle);
             $endProp = strpos($fileContents, $endRepeat, $lastPos);
@@ -1027,11 +1061,14 @@ class Scaffold
             $replaceThis = substr($fileContents, $beginning, $end-$beginning);
             $propertyTemplate = substr($fileContents, $lastPos, $endProp - $lastPos);
             $properties = "";
-            foreach($this->model->getProperties() as $property => $type) {
+
+            foreach($this->model->getProperties() as $property => $type)
+            {
                 $temp = str_replace("[property]", $property, $propertyTemplate);
                 $temp = str_replace("[Property]", ucfirst($property), $temp);
                 $properties .= $temp;
             }
+
             $properties = trim($properties, ",");
             $fileContents = str_replace($replaceThis, $properties, $fileContents);
         }

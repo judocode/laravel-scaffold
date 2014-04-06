@@ -104,6 +104,8 @@ class Migration
 
             $this->fileCreator->createMigrationClass($migrationFile, $fileContents, $className);
         }
+
+        return !$isTableCreated;
     }
 
     /**

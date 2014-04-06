@@ -20,19 +20,14 @@ class Model extends BaseModel
     private $propertiesToRemove = array();
 
     /**
-     * @var array
-     */
-    private $propertiesToChange = array();
-
-    /**
      * @var string
      */
     private $inputProperties;
 
     /**
-     * @var string
+     * @var bool
      */
-    private $namespaceGlobal;
+    private $namespaceGlobal = false;
 
     /**
      * @var array
@@ -50,13 +45,24 @@ class Model extends BaseModel
     private $relationshipsToRemove = array();
 
     /**
+     * @var bool
+     */
+    private $isPivotTable;
+
+    /**
      * @param Command $command
      * @param array $oldModelFile
      */
-    public function __construct(Command $command, $oldModelFile)
+    public function __construct(Command $command, $oldModelFile, $globalNamespace)
     {
         $this->command = $command;
         $this->oldModelFile = $oldModelFile;
+
+        if(!empty($globalNamespace))
+        {
+            $this->namespace = $globalNamespace;
+            $this->namespaceGlobal = true;
+        }
     }
 
     /**
@@ -94,23 +100,7 @@ class Model extends BaseModel
 
             $this->propertiesArr = $this->getPropertiesFromInput($this->inputProperties);
 
-            if(array_key_exists($this->getTableName(), $this->oldModelFile))
-            {
-                if(array_key_exists("properties", $this->oldModelFile[$this->getTableName()]))
-                {
-                    foreach ($this->oldModelFile[$this->getTableName()]["properties"] as $property => $type)
-                    {
-                        if(!array_key_exists($property, $this->propertiesArr))
-                        {
-                            $this->propertiesToRemove[$property] = $type;
-                        }
-                        else if($this->oldModelFile[$this->getTableName()]["properties"][$property] != $this->propertiesArr[$property])
-                        {
-                            $this->propertiesToChange[$property] = $this->propertiesArr[$property];
-                        }
-                    }
-                }
-            }
+            $this->propertiesToRemove = $this->generatePropertiesToRemove();
 
             if($this->propertiesArr === false)
                 return false;
@@ -214,29 +204,7 @@ class Model extends BaseModel
             unset($values[1]);
         }
 
-        if(array_key_exists($this->getTableName(), $this->oldModelFile))
-        {
-            if(array_key_exists("relationships", $this->oldModelFile[$this->getTableName()]))
-            {
-                foreach ($this->oldModelFile[$this->getTableName()]["relationships"] as $oldRelation)
-                {
-                    $found = false;
-                    foreach ($this->relationship as $relation)
-                    {
-                        if (isset($relation->model->tableName) && $relation->model->tableName == $oldRelation->model->tableName)
-                        {
-                            $found = true;
-                            break;
-                        }
-                    }
-
-                    if(!$found)
-                    {
-                        array_push($this->relationshipsToRemove, $oldRelation);
-                    }
-                }
-            }
-        }
+        $this->relationshipsToRemove = $this->generateRelationshipsToRemove();
     }
 
     /**
@@ -350,7 +318,7 @@ class Model extends BaseModel
                 }
                 else if($option == "pivot")
                 {
-                    $this->onlyMigration = true;
+                    $this->isPivotTable = true;
                     $skip = true;
                 }
             }
@@ -366,6 +334,60 @@ class Model extends BaseModel
                 }
 
                 $properties[$fieldName] = $type;
+            }
+        }
+
+        return $properties;
+    }
+
+    /**
+     *  Compare new models definition file with old file to return
+     *  a list of the relationships that have been removed
+     *
+     * @return array
+     */
+    private function generateRelationshipsToRemove()
+    {
+        $relationships = array();
+        if (array_key_exists($this->getTableName(), $this->oldModelFile)) {
+            if (array_key_exists("relationships", $this->oldModelFile[$this->getTableName()])) {
+                foreach ($this->oldModelFile[$this->getTableName()]["relationships"] as $oldRelation) {
+                    $found = false;
+                    foreach ($this->relationship as $relation) {
+                        if (isset($relation->model->tableName) && $relation->model->tableName == $oldRelation->model->tableName) {
+                            $found = true;
+                            break;
+                        }
+                    }
+
+                    if (!$found) {
+                        array_push($relationships, $oldRelation);
+                    }
+                }
+            }
+        }
+
+        return $relationships;
+    }
+
+    /**
+     *  Generates properties to remove based on properties that
+     *  have been removed since the last model definition file
+     *
+     * @return array
+     */
+    private function generatePropertiesToRemove()
+    {
+        $properties = array();
+        if (array_key_exists($this->getTableName(), $this->oldModelFile)) {
+            if (array_key_exists("properties", $this->oldModelFile[$this->getTableName()])) {
+                foreach ($this->oldModelFile[$this->getTableName()]["properties"] as $property => $type) {
+                    if (!array_key_exists($property, $this->propertiesArr)) {
+                        $properties[$property] = $type;
+                    } else if ($this->oldModelFile[$this->getTableName()]["properties"][$property] != $this->propertiesArr[$property]) {
+                        $properties[$property] = $this->propertiesArr[$property];
+                    }
+                }
             }
         }
 
