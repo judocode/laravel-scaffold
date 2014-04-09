@@ -181,7 +181,7 @@ class AssetDownloader
                 zip_close($zip);
                 \File::delete('public/bootstrap.zip');
 
-                $dirPath = 'public/dist';
+                $dirPath = 'public/bootstrap-3.1.1-dist';
                 $this->fileCreator->copyDirectory($dirPath, 'public/bootstrap');
                 foreach(new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dirPath, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST) as $path) {
                     $path->isFile() ? unlink($path->getPathname()) : rmdir($path->getPathname());
