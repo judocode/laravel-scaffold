@@ -472,13 +472,16 @@ class Scaffold
             return;
         }
 
-        $fileContents = "protected \$table = '". $this->model->getTableName() ."';\n";
+        if($this->model->hasSoftdeletes()) {
+            $fileContents = "use Illuminate\Database\Eloquent\SoftDeletingTrait;\n\t";
+        } else {
+            $fileContents = '';
+        }
+
+        $fileContents .= "protected \$table = '". $this->model->getTableName() ."';\n";
 
         if(!$this->model->hasTimestamps())
             $fileContents .= "\tpublic \$timestamps = false;\n";
-
-        if($this->model->hasSoftdeletes())
-            $fileContents .= "\tprotected \$softDelete = true;\n";
 
         $properties = "";
         foreach ($this->model->getProperties() as $property => $type) {
