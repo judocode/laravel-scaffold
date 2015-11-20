@@ -5,15 +5,18 @@ namespace Binondord\LaravelScaffold\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Composer;
-use Binondord\LaravelScaffold\Migrations\Scaffold;
-use Binondord\LaravelScaffold\Contracts\ScaffoldCommandInterface;
+use Illuminate\Console\GeneratorCommand;
+
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\ArgvInput;
-use Illuminate\Console\GeneratorCommand;
+
+use Binondord\LaravelScaffold\Migrations\Scaffold;
+use Binondord\LaravelScaffold\Contracts\Commands\ScaffoldCommandInterface;
+
 use Mockery;
 
-class ScaffoldCommand extends GeneratorCommand
+class ScaffoldCommand extends GeneratorCommand implements ScaffoldCommandInterface
 {
 
 	/**
@@ -97,6 +100,11 @@ class ScaffoldCommand extends GeneratorCommand
     	$name = parent::parseName($name);
         return $name;
     	#return $this->getObjName();
+    }
+
+    public function fire()
+    {
+
     }
 
 	/**

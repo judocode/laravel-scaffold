@@ -2,17 +2,14 @@
 
 use Illuminate\Console\AppNamespaceDetectorTrait;
 use Illuminate\Foundation\Composer;
-use Binondord\LaravelScaffold\Makes\MakeController;
-use Binondord\LaravelScaffold\Makes\MakeLayout;
-use Binondord\LaravelScaffold\Makes\MakeMigration;
-use Binondord\LaravelScaffold\Makes\MakeModel;
-use Binondord\LaravelScaffold\Traits\CommonTrait;
-use Binondord\LaravelScaffold\Makes\MakeSeed;
-use Binondord\LaravelScaffold\Makes\MakeView;
-use Binondord\LaravelScaffold\Migrations\Scaffold;
+
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\InputArgument;
-use Binondord\LaravelScaffold\Contracts\ScaffoldCommandInterface;
+
+use Binondord\LaravelScaffold\Traits\CommonTrait;
+use Binondord\LaravelScaffold\Migrations\Scaffold;
+use Binondord\LaravelScaffold\Contracts\Commands\ScaffoldCommandInterface;
+use Binondord\LaravelScaffold\Contracts\Services\ScaffoldServiceInterface;
 
 class ScaffoldFileCommand extends ScaffoldCommand implements ScaffoldCommandInterface
 {
@@ -39,7 +36,7 @@ class ScaffoldFileCommand extends ScaffoldCommand implements ScaffoldCommandInte
      */
     public function fire()
     {
-        $scaffold = new Scaffold($this);
+        $scaffold = app(ScaffoldServiceInterface::class, [$this]);
 
         $this->info('Please wait while all your files are generated...');
 
