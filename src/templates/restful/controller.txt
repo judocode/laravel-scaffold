@@ -1,0 +1,55 @@
+<?php
+
+namespace App\Http\Controllers;
+
+class [controller] extends Controller
+{
+	protected $[model];
+
+	public function __construct([repositoryInterface] $[model])
+	{
+		$this->[model] = $[model];
+	}
+
+	public function getIndex()
+	{
+    	$[models] = $this->[model]->all();
+        return view('[model].index', compact('[models]'));
+	}
+
+	public function getCreate()
+	{
+        return view('[model].create');
+	}
+
+	public function postIndex()
+	{
+        $this->[model]->store(\Request::only([repeat]'[property]',[/repeat]));
+        return redirect('[model]');
+	}
+
+	public function getDetails($id)
+	{
+        $[model] = $this->[model]->find($id);
+        return view('[model].show')->with('[model]', $[model]);
+	}
+
+	public function getEdit($id)
+	{
+        $[model] = $this->[model]->find($id);
+        return view('[model].edit')->with('[model]', $[model]);
+	}
+
+	public function putUpdate($id)
+	{
+        $this->[model]->find($id)->update(\Request::only([repeat]'[property]',[/repeat]));
+        return redirect('[model]/details/'.$id);
+	}
+
+	public function deleteDelete($id)
+	{
+        $this->[model]->destroy($id);
+        return redirect('[model]');
+	}
+
+}
