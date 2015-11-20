@@ -11,7 +11,7 @@ use Symfony\Component\Console\Input\InputArgument;
 
 use Binondord\LaravelScaffold\Traits\CommonTrait;
 use Binondord\LaravelScaffold\Contracts\Commands\ScaffoldCommandInterface;
-use Binondord\LaravelScaffold\Contracts\Services\ScaffoldServiceInterface;
+use Binondord\LaravelScaffold\Contracts\Services\ScaffoldInterface;
 
 class ScaffoldUpdateCommand extends ScaffoldCommand implements ScaffoldCommandInterface
 {
@@ -40,7 +40,7 @@ class ScaffoldUpdateCommand extends ScaffoldCommand implements ScaffoldCommandIn
     {
         $this->info('Updating...');
 
-        $scaffold = app(ScaffoldServiceInterface::class, [$this]);
+        $scaffold = app(ScaffoldInterface::class, [$this]);
 
         $scaffold->update();
 

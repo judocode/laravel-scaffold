@@ -2,6 +2,6 @@
 
 namespace Binondord\LaravelScaffold\Contracts\Services;
 
-interface ScaffoldServiceInterface {
+interface ScaffoldInterface {
 
 }

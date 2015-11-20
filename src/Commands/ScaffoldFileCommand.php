@@ -9,7 +9,7 @@ use Symfony\Component\Console\Input\InputArgument;
 use Binondord\LaravelScaffold\Traits\CommonTrait;
 use Binondord\LaravelScaffold\Migrations\Scaffold;
 use Binondord\LaravelScaffold\Contracts\Commands\ScaffoldCommandInterface;
-use Binondord\LaravelScaffold\Contracts\Services\ScaffoldServiceInterface;
+use Binondord\LaravelScaffold\Contracts\Services\ScaffoldInterface;
 
 class ScaffoldFileCommand extends ScaffoldCommand implements ScaffoldCommandInterface
 {
@@ -36,7 +36,7 @@ class ScaffoldFileCommand extends ScaffoldCommand implements ScaffoldCommandInte
      */
     public function fire()
     {
-        $scaffold = app(ScaffoldServiceInterface::class, [$this]);
+        $scaffold = app(ScaffoldInterface::class, [$this]);
 
         $this->info('Please wait while all your files are generated...');
 
