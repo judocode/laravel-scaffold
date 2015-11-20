@@ -1,26 +1,23 @@
 {
-    "name": "jrenton/laravel-scaffold",
-    "description": "Fastest way to rapidly scaffold a laravel application",
-    "keywords": ["laravel", "package", "scaffold", "command"],
-    "license": "MIT",
-    "authors": [
-        {
-            "name": "Justus Renton"
-        }
-    ],
-    "require": {
-        "php": ">=5.3.0",
-        "fzaninotto/faker": "v1.3.0"
-    },
-    "require-dev": {
-        "illuminate/support": "~4",
-        "illuminate/console": "~4",
-        "illuminate/filesystem": "~4"
-    },
-    "autoload": {
-        "psr-0": {
-            "Jrenton\\LaravelScaffold": "src/"
-        }
-    },
-    "minimum-stability": "dev"
+  "name": "binondord/laravel-scaffold",
+  "description": "Extend Laravel 5's generators scaffold. Base on jrenton/laravel-scaffold and laralib/l5scaffold",
+  "keywords": ["laravel", "generators", "scaffold" , "laravel5"],
+  "license": "MIT",
+  "minimum-stability": "dev",
+  "authors": [
+    {
+      "name": "Randy D. Binondo",
+      "email": "binondord@gmail.com"
+    }
+  ],
+  "require": {
+    "php": ">=5.4.0",
+    "illuminate/support": "~5.0",
+    "fzaninotto/faker": "^1.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "Binondord\\LaravelScaffold\\": "src/"
+    }
+  }
 }
