@@ -35,7 +35,7 @@ class GeneratorsServiceProvider extends ServiceProvider {
 	{
         $this->customBindings();
 		$this->registerScaffoldGenerator();
-
+        $this->addAliases();
 
 	}
 
@@ -118,7 +118,7 @@ class GeneratorsServiceProvider extends ServiceProvider {
         }
     }
 
-    protected function addAliases()
+    private function addAliases()
     {
         $app = $this->app;
         $facadePath = __NAMESPACE__.'\\Facades\\';
