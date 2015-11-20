@@ -7,7 +7,7 @@ Automatically generates the files you need to get up and running. Generates a de
 Begin by installing this package through Composer. Edit your project's `composer.json` file to require `jrenton/laravel-scaffold`
 
     "require-dev": {
-		"jrenton/laravel-scaffold": "dev-master"
+		"binondord/laravel-scaffold": "dev-master"
 	}
 
 Next, update Composer from the Terminal:
@@ -16,7 +16,7 @@ Next, update Composer from the Terminal:
 
 Once this operation completes, the final step is to add the service provider. Open `app/config/app.php`, and add a new item to the providers array.
 
-    'Jrenton\LaravelScaffold\LaravelScaffoldServiceProvider'
+    'Binondord\LaravelScaffold\GeneratorsServiceProvider'
 
 That's it! You're all set to go. Run the `artisan` command from the Terminal to see the new `scaffold` command.
 
@@ -26,7 +26,10 @@ That's it! You're all set to go. Run the `artisan` command from the Terminal to 
 
 Configure all file directories, class names, view files, whether or not you want repository pattern, which css/js files to download, and you can completely customize view and layout files from within the templates folder! Be sure to run:
 
-`php artisan config:publish jrenton/laravel-scaffold`
+```
+php artisan vendor:publish --tag=config --force
+php artisan vendor:publish --tag=templates --force
+```
 
 To include the config file within your config folder.
 
