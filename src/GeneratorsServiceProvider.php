@@ -2,10 +2,12 @@
 
 namespace Binondord\LaravelScaffold;
 
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Foundation\AliasLoader;
 
 class GeneratorsServiceProvider extends ServiceProvider {
+
+    protected $additionalAliases = [];
 
 	/**
 	 * Bootstrap the application services.
@@ -67,16 +69,23 @@ class GeneratorsServiceProvider extends ServiceProvider {
             ]
         ];
 
-        foreach($customBindings as $group => $customBinding)
+        foreach($customBindings as $group => $items)
         {
-            foreach($customBinding as $unit)
+            foreach($items as $customBinding)
             {
-                $unit = in_array($group, $usePrefix) ? $group.$unit : $unit;
+                $unit = in_array($group, $usePrefix) ? $group.$customBinding : $customBinding;
+
+                $this->additionalAliases[] = 'Rdb'.$unit;
 
                 $class = __NAMESPACE__ ."\\".$group."s"."\\".$unit;
                 $contract = __NAMESPACE__ ."\\Contracts\\".$group."s\\".$unit."Interface";
 
                 $this->app->bind($contract, $class);
+
+                $this->app->bindShared(strtolower($unit), function($app) use($group, $unit)
+                {
+                    return app(__NAMESPACE__.'\\Contracts\\'.$group.'\\'.$unit.'Interface');
+                });
             }
         }
     }
@@ -88,7 +97,7 @@ class GeneratorsServiceProvider extends ServiceProvider {
     private function registerScaffoldGenerator()
     {
         $nameBase = 'command.larascaf.';
-        $namespace = 'Binondord\\LaravelScaffold\\Commands\\';
+        $commandNamespace = __NAMESPACE__.'Commands\\';
 
         $commands = [
             'make',
@@ -99,7 +108,7 @@ class GeneratorsServiceProvider extends ServiceProvider {
 
         foreach($commands as $command)
         {
-            $class = $namespace.'Scaffold'.ucfirst($command).'Command';
+            $class = $commandNamespace.'Scaffold'.ucfirst($command).'Command';
             $bindname = $nameBase.'scaffold'.$command;
             $this->app->singleton($bindname, function ($app) use($class){
                 return $app[$class];
@@ -107,6 +116,38 @@ class GeneratorsServiceProvider extends ServiceProvider {
 
             $this->commands($bindname);
         }
+    }
+
+    protected function addAliases()
+    {
+        $app = $this->app;
+        $facadePath = __NAMESPACE__.'\\Facades\\';
+        $additionalAliases =  $this->additionalAliases;
+
+        $app->booting(function() use($additionalAliases, $facadePath){
+            $loader = AliasLoader::getInstance();
+            $aliases = $loader->getAliases();
+
+            foreach($additionalAliases as $additionalAlias){
+                $i=0;
+                $key = $additionalAlias;
+                do{
+                    $isAliasExist = array_key_exists($key, $aliases);
+                    if($isAliasExist){
+                        throw new \Exception("Alias {$key} already existed.");
+                    }
+
+                    if($isAliasExist){
+                        $i++;
+                        $key = $additionalAlias.$i;
+                        continue;
+                    }
+
+                    $aliases[$key] =  $facadePath.$additionalAlias;
+                }while($isAliasExist);
+            }
+            $loader->setAliases($aliases);
+        });
     }
 
 }
