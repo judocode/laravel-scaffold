@@ -12,7 +12,7 @@ namespace Binondord\LaravelScaffold\Makes;
 use Illuminate\Filesystem\Filesystem;
 use Binondord\LaravelScaffold\Commands\ScaffoldMakeCommand;
 use Binondord\LaravelScaffold\Traits\MakerTrait;
-use Binondord\LaravelScaffold\Contracts\ScaffoldCommandInterface;
+use Binondord\LaravelScaffold\Contracts\Commands\ScaffoldCommandInterface;
 
 class MakeModel extends BaseMake
 {

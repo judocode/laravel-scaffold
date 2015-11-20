@@ -3,9 +3,10 @@
 namespace Binondord\LaravelScaffold\Traits;
 
 use Binondord\LaravelScaffold\Makes\MakeModel;
+use Binondord\LaravelScaffold\Contracts\Commands\ScaffoldCommandInterface;
 
 trait CommonTrait {
-    protected $commandContract = Binondord\LaravelScaffold\Contracts\ScaffoldCommandInterface::class;
+    protected $commandContract = ScaffoldCommandInterface::class;
 
     protected function useUtf8Encoding($argument)
     {

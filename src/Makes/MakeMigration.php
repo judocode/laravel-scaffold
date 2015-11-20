@@ -13,7 +13,7 @@ use Illuminate\Filesystem\Filesystem;
 use Binondord\LaravelScaffold\Migrations\SchemaParser;
 use Binondord\LaravelScaffold\Migrations\SyntaxBuilder;
 use Binondord\LaravelScaffold\Traits\MakerTrait;
-use Binondord\LaravelScaffold\Contracts\ScaffoldCommandInterface;
+use Binondord\LaravelScaffold\Contracts\Commands\ScaffoldCommandInterface;
 
 class MakeMigration extends BaseMake
 {

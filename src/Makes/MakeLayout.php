@@ -5,7 +5,7 @@ namespace Binondord\LaravelScaffold\Makes;
 use Illuminate\Filesystem\Filesystem;
 
 use Binondord\LaravelScaffold\Traits\MakerTrait;
-use Binondord\LaravelScaffold\Contracts\ScaffoldCommandInterface;
+use Binondord\LaravelScaffold\Contracts\Commands\ScaffoldCommandInterface;
 use Binondord\LaravelScaffold\Contracts\Makes\MakeLayoutInterface;
 
 class MakeLayout extends BaseMake implements MakeLayoutInterface

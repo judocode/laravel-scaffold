@@ -1,8 +1,8 @@
 <?php namespace Binondord\LaravelScaffold\Migrations;
 
 use Illuminate\Console\Command;
-use Binondord\LaravelScaffold\Contracts\FileCreatorInterface;
-use Binondord\LaravelScaffold\Contracts\ScaffoldCommandInterface;
+use Binondord\LaravelScaffold\Contracts\Migrations\FileCreatorInterface;
+use Binondord\LaravelScaffold\Contracts\Commands\ScaffoldCommandInterface;
 
 /**
  * From Jrenton\LaravelScaffold\FileCreator
