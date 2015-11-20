@@ -97,7 +97,7 @@ class GeneratorsServiceProvider extends ServiceProvider {
     private function registerScaffoldGenerator()
     {
         $nameBase = 'command.larascaf.';
-        $commandNamespace = __NAMESPACE__.'Commands\\';
+        $commandNamespace = __NAMESPACE__.'\\Commands\\';
 
         $commands = [
             'make',
