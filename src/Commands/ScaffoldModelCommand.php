@@ -10,7 +10,7 @@ use Symfony\Component\Console\Input\InputArgument;
 
 use Binondord\LaravelScaffold\Traits\CommonTrait;
 use Binondord\LaravelScaffold\Contracts\Commands\ScaffoldCommandInterface;
-use Binondord\LaravelScaffold\Contracts\Services\ScaffoldServiceInterface;
+use Binondord\LaravelScaffold\Contracts\Services\ScaffoldInterface;
 
 class ScaffoldModelCommand extends ScaffoldCommand implements ScaffoldCommandInterface
 {
@@ -37,7 +37,7 @@ class ScaffoldModelCommand extends ScaffoldCommand implements ScaffoldCommandInt
      */
     public function fire()
     {
-        $scaffold = app(ScaffoldServiceInterface::class, [$this]);
+        $scaffold = app(ScaffoldInterface::class, [$this]);
 
         $scaffold->createModels();
 
