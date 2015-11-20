@@ -1,19 +1,14 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: fernandobritofl
- * Date: 4/22/15
- * Time: 11:49 PM
- */
 
 namespace Binondord\LaravelScaffold\Makes;
 
-
 use Illuminate\Filesystem\Filesystem;
+
 use Binondord\LaravelScaffold\Traits\MakerTrait;
 use Binondord\LaravelScaffold\Contracts\ScaffoldCommandInterface;
+use Binondord\LaravelScaffold\Contracts\Makes\MakeLayoutInterface;
 
-class MakeLayout extends BaseMake
+class MakeLayout extends BaseMake implements MakeLayoutInterface
 {
     use MakerTrait;
 
@@ -41,9 +36,9 @@ class MakeLayout extends BaseMake
         $path_file = $this->getPathResource().$file;
         $path_stub = __DIR__ .'/../'.$stub;
 
-        if (!$this->files->exists($path_file)){
-            $html = $this->files->get($path_stub);
-            $this->files->put($path_file, $html);
+        if (!\File::exists($path_file)){
+            $html = \File::get($path_stub);
+            \File::put($path_file, $html);
 
             $this->command->info("$name created successfully.");
         }else{

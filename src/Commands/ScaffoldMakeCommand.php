@@ -11,7 +11,6 @@ use Symfony\Component\Console\Input\InputArgument;
 
 use Binondord\LaravelScaffold\Migrations\Scaffold;
 use Binondord\LaravelScaffold\Contracts\Commands\ScaffoldCommandInterface;
-use Binondord\LaravelScaffold\Contracts\Services\ScaffoldServiceInterface;
 
 class ScaffoldMakeCommand extends ScaffoldCommand implements ScaffoldCommandInterface
 {
