@@ -5,17 +5,13 @@ namespace Binondord\LaravelScaffold\Commands;
 use Illuminate\Console\AppNamespaceDetectorTrait;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Composer;
-use Binondord\LaravelScaffold\Makes\MakeController;
-use Binondord\LaravelScaffold\Makes\MakeLayout;
-use Binondord\LaravelScaffold\Makes\MakeMigration;
-use Binondord\LaravelScaffold\Makes\MakeModel;
-use Binondord\LaravelScaffold\Traits\CommonTrait;
-use Binondord\LaravelScaffold\Makes\MakeSeed;
-use Binondord\LaravelScaffold\Makes\MakeView;
-use Binondord\LaravelScaffold\Migrations\Scaffold;
+
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\InputArgument;
-use Binondord\LaravelScaffold\Contracts\ScaffoldCommandInterface;
+
+use Binondord\LaravelScaffold\Traits\CommonTrait;
+use Binondord\LaravelScaffold\Contracts\Commands\ScaffoldCommandInterface;
+use Binondord\LaravelScaffold\Contracts\Services\ScaffoldServiceInterface;
 
 class ScaffoldUpdateCommand extends ScaffoldCommand implements ScaffoldCommandInterface
 {
@@ -44,7 +40,7 @@ class ScaffoldUpdateCommand extends ScaffoldCommand implements ScaffoldCommandIn
     {
         $this->info('Updating...');
 
-        $scaffold = new Scaffold($this);
+        $scaffold = app(ScaffoldServiceInterface::class, [$this]);
 
         $scaffold->update();
 

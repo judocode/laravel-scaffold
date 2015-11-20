@@ -5,16 +5,13 @@ namespace Binondord\LaravelScaffold\Commands;
 use Illuminate\Console\AppNamespaceDetectorTrait;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Composer;
-use Binondord\LaravelScaffold\Makes\MakeController;
-use Binondord\LaravelScaffold\Makes\MakeLayout;
-use Binondord\LaravelScaffold\Makes\MakeMigration;
-use Binondord\LaravelScaffold\Makes\MakeModel;
-use Binondord\LaravelScaffold\Makes\MakeSeed;
-use Binondord\LaravelScaffold\Makes\MakeView;
-use Binondord\LaravelScaffold\Migrations\Scaffold;
+
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\InputArgument;
-use Binondord\LaravelScaffold\Contracts\ScaffoldCommandInterface;
+
+use Binondord\LaravelScaffold\Migrations\Scaffold;
+use Binondord\LaravelScaffold\Contracts\Commands\ScaffoldCommandInterface;
+use Binondord\LaravelScaffold\Contracts\Services\ScaffoldServiceInterface;
 
 class ScaffoldMakeCommand extends ScaffoldCommand implements ScaffoldCommandInterface
 {
@@ -41,9 +38,7 @@ class ScaffoldMakeCommand extends ScaffoldCommand implements ScaffoldCommandInte
      */
     public function fire()
     {
-
-
-        /*
+        /**/
         // Start Scaffold
         $this->prepFire();
 
@@ -53,7 +48,7 @@ class ScaffoldMakeCommand extends ScaffoldCommand implements ScaffoldCommandInte
         $this->makeModel();
         $this->makeController();
         $this->makeViewLayout();
-        $this->makeViews();*/
+        $this->makeViews();
 
 
     }
