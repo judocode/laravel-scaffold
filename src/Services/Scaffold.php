@@ -3,9 +3,10 @@
 use Illuminate\Console\Command;
 use Faker\Factory;
 use Illuminate\Filesystem\FileNotFoundException;
-use Binondord\LaravelScaffold\Contracts\AssetDownloaderInterface;
-use Binondord\LaravelScaffold\Contracts\ScaffoldCommandInterface;
-use Binondord\LaravelScaffold\Contracts\FileCreatorInterface;
+
+use Binondord\LaravelScaffold\Contracts\Migrations\AssetDownloaderInterface;
+use Binondord\LaravelScaffold\Contracts\Migrations\FileCreatorInterface;
+use Binondord\LaravelScaffold\Contracts\Commands\ScaffoldCommandInterface;
 use Binondord\LaravelScaffold\Contracts\Services\ScaffoldInterface;
 
 /**
@@ -62,7 +63,7 @@ class Scaffold implements ScaffoldInterface
     protected $configSettings;
 
     /**
-     * @var \Binondord\LaravelScaffold\Contracts\ScaffoldCommandInterface;
+     * @var \Binondord\LaravelScaffold\Contracts\Commands\ScaffoldCommandInterface;
      */
     protected $command;
 
