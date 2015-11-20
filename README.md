@@ -1,4 +1,4 @@
-[![Build Status](https://img.shields.io/travis/cakephp/cakephp/master.svg?style=flat-square)](https://travis-ci.org/cakephp/cakephp)
+[![Build Status](https://img.shields.io/travis/binondord/laravel-scaffold/master.svg?style=flat-square)](https://travis-ci.org/binondord/laravel-scaffold)
 
 ## Laravel 5 Scaffold Command
 
