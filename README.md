@@ -1,3 +1,5 @@
+[![Build Status](https://img.shields.io/travis/binondord/laravel-scaffold/master.svg?style=flat-square)](https://travis-ci.org/binondord/laravel-scaffold)
+
 ## Laravel 5 Scaffold Command
 
 Automatically generates the files you need to get up and running. Generates a default layout, sets up bootstrap or foundation, prompts for javascript files (options are ember, angular, backbone, underscore, and jquery), creates model, controller, and views, runs migration, updates routes, and seeds your new table with mock data - all in one command.
