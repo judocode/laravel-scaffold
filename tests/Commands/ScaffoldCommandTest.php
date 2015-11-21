@@ -6,6 +6,6 @@ class ScaffoldCommandTest Extends \TestCase
 {
 	public function testSample()
 	{
-		$this->testAssertTrue(true);
+		$this->assertTrue(true);
 	}
 }

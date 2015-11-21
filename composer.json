@@ -13,7 +13,8 @@
   "require": {
     "php": ">=5.4.0",
     "illuminate/support": "~5.0",
-    "fzaninotto/faker": "^1.5"
+    "fzaninotto/faker": "^1.5",
+    "mockery/mockery": "^0.9.4"
   },
   "autoload": {
     "psr-4": {
