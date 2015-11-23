@@ -993,7 +993,7 @@ class Scaffold implements ScaffoldInterface
             try
             {
                 $this->makeFileFromTemplate($fileName, $pathToViews."$view.blade.php");
-                $success = false;
+                $success = true;
             }
             catch(FileNotFoundException $e)
             {
@@ -1005,6 +1005,7 @@ class Scaffold implements ScaffoldInterface
                 $transferMap = $this->configSettings['transfers']['views'];
                 if(in_array($view, array_keys($transferMap)))
                 {
+                    $this->fileCreator->createDirectory($transferMap[$view]);
                     $this->fileCreator->copyFile($fileName, $transferMap[$view].'/'.$fileName);
                 }
             }
