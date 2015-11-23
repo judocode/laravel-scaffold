@@ -24,7 +24,8 @@
                     [models]        : [],
                     search          : [],
                     columns     : [
-                        [repeat]{'field': '[property]','title': '[Property]'},[/repeat]
+                        [repeat]{'field': '[property]','title': '[Property]'},
+						[/repeat]
                     ]
                 });
 
@@ -32,7 +33,7 @@
                 angular.extend(this, {
                     loadList: function(){
                         _this.isLoaded = false;
-                        $http.get('/api/all-['models]').success(function(d){
+                        $http.get('/api/all-[models]').success(function(d){
                             _this.[models] = d.data;
                             _this.countItems = d.count;
                             _this.order(_this.field);
@@ -43,7 +44,7 @@
                     order : function(d){
                         _this.field = d;
                         _this.isReverse = !_this.isReverse;
-                        _this.['models'] = orderBy(_this.['models'], d, _this.isReverse);
+                        _this.[models] = orderBy(_this.[models], d, _this.isReverse);
                     }
                 });
 
@@ -51,12 +52,12 @@
 
                 //event listener
 
-                var createListener = $rootScope.$on('['models']Ctrl.create', function (event, data) {
-                    _this.['models'] = data.data;
+                var createListener = $rootScope.$on('[models]Ctrl.create', function (event, data) {
+                    _this.[models] = data.data;
                 });
 
-                var updateListener = $rootScope.$on('['models']Ctrl.update', function (event, data) {
-                    //$scope.['models'] = data.data;
+                var updateListener = $rootScope.$on('[models]Ctrl.update', function (event, data) {
+                    //$scope.[models] = data.data;
                 });
 
                 $scope.$on('$destroy', function(){
