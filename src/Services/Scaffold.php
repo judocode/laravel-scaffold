@@ -120,7 +120,9 @@ class Scaffold implements ScaffoldInterface
         'views',
         'repository',
         'baseRepository',
-        'modelDefinitionsFile'
+        'modelDefinitionsFile',
+        'useRepository',
+        'useBaseRepository'
     );
 
     public function __construct(ScaffoldCommandInterface $command)
