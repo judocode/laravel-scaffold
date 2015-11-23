@@ -139,6 +139,9 @@ class FileCreator implements FileCreatorInterface
      */
     public function createFile($fileName, $fileContents, $overwrite = false)
     {
+        $dirName = dirname($fileName);
+        $this->createDirectory($dirName);
+
         if(\File::exists($fileName) && !$overwrite) {
             $overwrite = $this->fromFile ? true : $this->command->confirm("$fileName already exists! Overwrite it? ", true);
 
@@ -155,7 +158,7 @@ class FileCreator implements FileCreatorInterface
     public function createDirectory($dir)
     {
         if (!\File::isDirectory($dir))
-            \File::makeDirectory($dir);
+            \File::makeDirectory($dir, 0755, true);
     }
 
     /**

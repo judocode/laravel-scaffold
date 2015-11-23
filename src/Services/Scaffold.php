@@ -389,6 +389,8 @@ class Scaffold implements ScaffoldInterface
             if(!$this->namespaceGlobal)
                 $this->namespace = "";
 
+            $this->namespace = "App\\Models";
+
             $this->model = new Model($this->command, $oldModelFile, $this->namespace);
 
             $this->model->generateModel($modelAndProperties);
@@ -574,7 +576,7 @@ class Scaffold implements ScaffoldInterface
             if(strpos($fileContents, $relation->getName()) !== false && !$newModel)
                 continue;
 
-            $functionContent = "\t\treturn \$this->" . $relation->getType() . "('" . $relatedModel->nameWithNamespace() . "');\n";
+            $functionContent = "\t\treturn \$this->" . $relation->getType() . "(\\" . $relatedModel->nameWithNamespace() . "::class);\n";
             $fileContents .= $this->fileCreator->createFunction($relation->getName(), $functionContent);
 
             $relatedModelFile = $this->configSettings['pathTo']['models'] . $relatedModel->upper() . '.php';
