@@ -136,7 +136,9 @@ return array(
         'show',
         'edit',
         'create',
-        'index'
+        'index',
+        'script',
+        'data_object'
 
     )
 );
