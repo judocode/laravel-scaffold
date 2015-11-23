@@ -24,12 +24,12 @@ class MakeView extends BaseMake
     function __construct(ScaffoldCommandInterface $command, Filesystem $files)
     {
         parent::__construct($command, $files);
-        $this->start();
     }
 
     public function setView($viewName)
     {
         $this->viewName = $viewName;
+        $this->start();
     }
 
     private function start()

@@ -1034,6 +1034,11 @@ class Scaffold implements ScaffoldInterface
         $this->fileCreator->createFile($fileName, $fileContents);
     }
 
+    private function finalizeView()
+    {
+
+    }
+
     /**
      *  Replace [model] tags in template with the model name
      *
