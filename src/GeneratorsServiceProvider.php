@@ -101,7 +101,7 @@ class GeneratorsServiceProvider extends ServiceProvider {
 
         $commands = [
             'make',
-            'model',
+            /*'model',*/
             'update',
             'file',
         ];

@@ -472,6 +472,7 @@ class Scaffold implements ScaffoldInterface
                     $this->putRepositoryFolderInStartFiles();
                 }
 
+
                 $this->createController();
 
                 $this->createViews();
@@ -683,8 +684,9 @@ class Scaffold implements ScaffoldInterface
      */
     private function copyTemplateFiles()
     {
-        if(!\File::isDirectory($this->configSettings['pathTo']['templates']))
+        if(!\File::isDirectory($this->configSettings['pathTo']['templates'])) {
             $this->fileCreator->copyDirectory("vendor/binondord/laravel-scaffold/src/templates/", $this->configSettings['pathTo']['templates']);
+        }
     }
 
     /**

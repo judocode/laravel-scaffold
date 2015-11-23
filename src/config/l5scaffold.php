@@ -86,7 +86,8 @@ return array(
         'tests' => 'tests',
         'views' => 'resources/views',
         'routes' => 'app/Http',
-        'layout' => 'resources/views/layouts/default.blade.php'
+        'layout' => 'resources/views/layouts/default.blade.php',
+        'angular' => 'public/angular'
 
     ),
 
