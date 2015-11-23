@@ -122,7 +122,8 @@ class Scaffold implements ScaffoldInterface
         'baseRepository',
         'modelDefinitionsFile',
         'useRepository',
-        'useBaseRepository'
+        'useBaseRepository',
+        'transfers'
     );
 
     public function __construct(ScaffoldCommandInterface $command)
@@ -987,13 +988,25 @@ class Scaffold implements ScaffoldInterface
         {
             $fileName = $dir . "$view.blade.php";
 
+            $success = false;
+
             try
             {
                 $this->makeFileFromTemplate($fileName, $pathToViews."$view.blade.php");
+                $success = false;
             }
             catch(FileNotFoundException $e)
             {
                 $this->command->error("Template file ".$pathToViews . $view.".blade.txt does not exist! You need to create it to generate that file!");
+            }
+
+            if($success)
+            {
+                $transferMap = $this->configSettings['transfers']['views'];
+                if(in_array($view, array_keys($transferMap)))
+                {
+                    $this->fileCreator->copyFile($fileName, $transferMap[$view].'/'.$fileName);
+                }
             }
         }
     }

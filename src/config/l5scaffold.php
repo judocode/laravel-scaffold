@@ -140,5 +140,12 @@ return array(
         'script',
         'data_object'
 
+    ),
+
+    'transfers' => array(
+        'views' =>
+            [
+                'script' => 'public/angular/controllers'
+            ]
     )
 );
