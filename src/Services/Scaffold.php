@@ -682,7 +682,7 @@ class Scaffold implements ScaffoldInterface
     private function copyTemplateFiles()
     {
         if(!\File::isDirectory($this->configSettings['pathTo']['templates']))
-            $this->fileCreator->copyDirectory("vendor/laralib/l5scaffold/src/Binondord/LaravelScaffold/templates/", $this->configSettings['pathTo']['templates']);
+            $this->fileCreator->copyDirectory("vendor/binondord/laravel-scaffold/src/templates/", $this->configSettings['pathTo']['templates']);
     }
 
     /**
@@ -1008,7 +1008,7 @@ class Scaffold implements ScaffoldInterface
         catch(FileNotFoundException $e)
         {
             $shortTemplate = substr($template, strpos($template, $this->configSettings["pathTo"]["templates"]) + strlen($this->configSettings["pathTo"]["templates"]),strlen($template)-strlen($this->configSettings["pathTo"]["templates"]));
-            $this->fileCreator->copyFile("vendor/jrenton/laravel-scaffold/src/Jrenton/LaravelScaffold/templates/".$shortTemplate, $template);
+            $this->fileCreator->copyFile("vendor/binondord/laravel-scaffold/src/templates/".$shortTemplate, $template);
             $fileContents = \File::get($template);
         }
 
