@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Contracts\Repositories\[repositoryInterface];
+
 class [controller] extends Controller
 {
 	protected $[model];
