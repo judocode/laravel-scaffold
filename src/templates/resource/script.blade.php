@@ -24,7 +24,7 @@
                     [models]        : [],
                     search          : [],
                     columns     : [
-                        [repeat]{'field': '[property','title': '[Property]'},[/repeat]
+                        [repeat]{'field': '[property]','title': '[Property]'},[/repeat]
                     ]
                 });
 
