@@ -41,7 +41,7 @@ class [controller] extends Controller
      */
 	public function store()
 	{
-        $this->[model]->store(\Input::only([repeat]'[property]',[/repeat]));
+        $this->[model]->store(\Request::only([repeat]'[property]',[/repeat]));
         return redirect()->route('[model].index');
 	}
 
@@ -77,7 +77,7 @@ class [controller] extends Controller
      */
 	public function update($id)
 	{
-        $this->[model]->find($id)->update(\Input::only([repeat]'[property]',[/repeat]));
+        $this->[model]->find($id)->update(\Request::only([repeat]'[property]',[/repeat]));
         return redirect()->route('[model].show', $id)->with('message', 'Item updated successfully.');
 	}
 

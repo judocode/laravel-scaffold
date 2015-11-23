@@ -1,12 +1,12 @@
 @extends('layout')
 @section('header')
     <div class="page-header">
-        <h1>{{Class}} / Show #{{${{classSingle}}->id}}</h1>
-        <form action="{{ route('{{class}}.destroy', ${{classSingle}}->id) }}" method="POST" style="display: inline;" onsubmit="if(confirm('Delete? Are you sure?')) { return true } else {return false };">
+        <h1>[Model] / Show #{{$[model]->id}}</h1>
+        <form action="{{ route('[model].destroy', $[model]->id) }}" method="POST" style="display: inline;" onsubmit="if(confirm('Delete? Are you sure?')) { return true } else {return false };">
             <input type="hidden" name="_method" value="DELETE">
             <input type="hidden" name="_token" value="{{ csrf_token() }}">
             <div class="btn-group pull-right" role="group" aria-label="...">
-                <a class="btn btn-warning btn-group" role="group" href="{{ route('{{class}}.edit', ${{classSingle}}->id) }}"><i class="glyphicon glyphicon-edit"></i> Edit</a>
+                <a class="btn btn-warning btn-group" role="group" href="{{ route('[model].edit', $[model]->id) }}"><i class="glyphicon glyphicon-edit"></i> Edit</a>
                 <button type="submit" class="btn btn-danger">Delete <i class="glyphicon glyphicon-trash"></i></button>
             </div>
         </form>
@@ -25,7 +25,7 @@
                 {{content_fields}}
             </form>
 
-            <a class="btn btn-link" href="{{ route('{{class}}.index') }}"><i class="glyphicon glyphicon-backward"></i>  Back</a>
+            <a class="btn btn-link" href="{{ route('[model].index') }}"><i class="glyphicon glyphicon-backward"></i>  Back</a>
 
         </div>
     </div>

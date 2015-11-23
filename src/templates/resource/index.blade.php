@@ -3,8 +3,8 @@
 @section('header')
     <div class="page-header clearfix">
         <h1>
-            <i class="glyphicon glyphicon-align-justify"></i> {{Class}}
-            <a class="btn btn-success pull-right" href="{{ route('{{class}}.create') }}"><i class="glyphicon glyphicon-plus"></i> Create</a>
+            <i class="glyphicon glyphicon-align-justify"></i> [Model]
+            <a class="btn btn-success pull-right" href="{{ route('[model].create') }}"><i class="glyphicon glyphicon-plus"></i> Create</a>
         </h1>
 
     </div>
@@ -13,7 +13,7 @@
 @section('content')
     <div class="row">
         <div class="col-md-12">
-            @if(${{class}}->count())
+            @if($[models]->count())
                 <table class="table table-condensed table-striped">
                     <thead>
                     <tr>
@@ -24,14 +24,14 @@
                     </thead>
 
                     <tbody>
-                    @foreach(${{class}} as ${{classSingle}})
+                    @foreach($[models] as $[model])
                         <tr>
-                            <td>{{${{classSingle}}->id}}</td>
+                            <td>{{$[model]->id}}</td>
                             {{content_fields}}
                             <td class="text-right">
-                                <a class="btn btn-xs btn-primary" href="{{ route('{{class}}.show', ${{classSingle}}->id) }}"><i class="glyphicon glyphicon-eye-open"></i> View</a>
-                                <a class="btn btn-xs btn-warning" href="{{ route('{{class}}.edit', ${{classSingle}}->id) }}"><i class="glyphicon glyphicon-edit"></i> Edit</a>
-                                <form action="{{ route('{{class}}.destroy', ${{classSingle}}->id) }}" method="POST" style="display: inline;" onsubmit="if(confirm('Delete? Are you sure?')) { return true } else {return false };">
+                                <a class="btn btn-xs btn-primary" href="{{ route('[model].show', $[model]->id) }}"><i class="glyphicon glyphicon-eye-open"></i> View</a>
+                                <a class="btn btn-xs btn-warning" href="{{ route('[model].edit', $[model]->id) }}"><i class="glyphicon glyphicon-edit"></i> Edit</a>
+                                <form action="{{ route('[model].destroy', $[model]->id) }}" method="POST" style="display: inline;" onsubmit="if(confirm('Delete? Are you sure?')) { return true } else {return false };">
                                     <input type="hidden" name="_method" value="DELETE">
                                     <input type="hidden" name="_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-xs btn-danger"><i class="glyphicon glyphicon-trash"></i> Delete</button>
@@ -41,7 +41,7 @@
                     @endforeach
                     </tbody>
                 </table>
-                {!! ${{class}}->render() !!}
+                {!! $[model]->render() !!}
             @else
                 <h3 class="text-center alert alert-info">Empty!</h3>
             @endif

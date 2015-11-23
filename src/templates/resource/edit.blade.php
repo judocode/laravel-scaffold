@@ -2,7 +2,7 @@
 
 @section('header')
     <div class="page-header">
-        <h1><i class="glyphicon glyphicon-edit"></i> {{Class}} / Edit #{{${{classSingle}}->id}}</h1>
+        <h1><i class="glyphicon glyphicon-edit"></i> [Model] / Edit #{{$[model]->id}}</h1>
     </div>
 @endsection
 
@@ -12,7 +12,7 @@
     <div class="row">
         <div class="col-md-12">
 
-            <form action="{{ route('{{class}}.update', ${{classSingle}}->id) }}" method="POST">
+            <form action="{{ route('[model].update', $[model]->id) }}" method="POST">
                 <input type="hidden" name="_method" value="PUT">
                 <input type="hidden" name="_token" value="{{ csrf_token() }}">
 
