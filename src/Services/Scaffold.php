@@ -1,8 +1,17 @@
 <?php namespace Binondord\LaravelScaffold\Services;
 
-use Illuminate\Console\Command;
 use Faker\Factory;
+use Illuminate\Console\Command;
 use Illuminate\Filesystem\FileNotFoundException;
+
+use Binondord\LaravelScaffold\Migrations\AssetDownloader;
+use Binondord\LaravelScaffold\Migrations\FileCreator;
+use Binondord\LaravelScaffold\Migrations\Migration;
+use Binondord\LaravelScaffold\Migrations\Model;
+use Binondord\LaravelScaffold\Migrations\NameParser;
+use Binondord\LaravelScaffold\Migrations\Relation;
+use Binondord\LaravelScaffold\Migrations\SchemaParser;
+use Binondord\LaravelScaffold\Migrations\SyntaxBuilder;
 
 use Binondord\LaravelScaffold\Contracts\Migrations\AssetDownloaderInterface;
 use Binondord\LaravelScaffold\Contracts\Migrations\FileCreatorInterface;
