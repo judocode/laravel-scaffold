@@ -65,6 +65,11 @@ class Migration
     private $currentFileContents;
 
     /**
+     * @var array
+     */
+    private $createdMigrationFiles = array();
+
+    /**
      * @param string $path
      * @param Model $model
      * @param FileCreator $fileCreator
@@ -109,9 +114,22 @@ class Migration
             }
 
             $this->fileCreator->createMigrationClass($migrationFile, $fileContents, $className);
+
+            $actualContent = \File::get($migrationFile);
+            $this->createdMigrationFiles[md5($actualContent)] = $migrationFile;
         }
 
         return !$isTableCreated;
+    }
+
+    /**
+     *  Return all migration files created ready for caching and later feed to scaffold:reset
+     *
+     * @return array
+     */
+    public function getCreatedMigrationFiles()
+    {
+        return $this->createdMigrationFiles;
     }
 
     /**

@@ -38,6 +38,21 @@ class Scaffold implements ScaffoldInterface
     private $createdFilesCache = array();
 
     /**
+     * @var array
+     */
+    private $createDirCache = array();
+
+    /**
+     * @var array
+     */
+    private $createdItemsCache = array();
+
+    /**
+     * @var array
+     */
+    private $createMigrationFilesCache = array();
+
+    /**
      * @var Model
      */
     private $model;
@@ -303,6 +318,14 @@ class Scaffold implements ScaffoldInterface
             }
         }
 
+        $contentFilesCache =  serialize([
+            'createdFilesCache' => $this->createdFilesCache,
+            'createdDirCache' => $this->createDirCache,
+            'createdMigrationCache' => $this->createMigrationFilesCache
+        ]);
+
+        $this->fileCreator->createFile($this->getCreatedFilesCache(), $contentFilesCache);
+
         // If any models existed in the cached file,
         // and not in the current file, drop that table
         foreach ($oldModelFile as $tableName => $modelData)
@@ -463,8 +486,12 @@ class Scaffold implements ScaffoldInterface
 
         if(\File::exists($this->getCreatedFilesCache()))
         {
-            $createdFiles = \File::get($this->getCreatedFilesCache());
-            $createdFilesArray = unserialize($createdFiles);
+            $createdFilesCache = \File::get($this->getCreatedFilesCache());
+            $createdFilesCacheArray = unserialize($createdFilesCache);
+            $createdFilesArray = $createdFilesCacheArray['createdFilesCache'];
+            $createdMigrationArray = $createdFilesCacheArray['createdMigrationCache'];
+            $createdFilesArray = array_merge($createdFilesArray, $createdMigrationArray);
+
             foreach($createdFilesArray as $key=>$createdFile)
             {
                 if(\File::exists($createdFile))
@@ -476,6 +503,17 @@ class Scaffold implements ScaffoldInterface
                     }else{
                         $remainingFiles[$key] = $createdFile;
                     }
+                }
+            }
+
+            $createdDirCacheArray = $createdFilesCacheArray['createdDirCache'];
+
+            foreach($createdDirCacheArray as $createdDir)
+            {
+                $listFiles = \File::files($createdDir);
+                if(empty($listFiles))
+                {
+                    \File::deleteDirectory($createdDir);
                 }
             }
 
@@ -522,6 +560,8 @@ class Scaffold implements ScaffoldInterface
 
         $tableCreated = $this->migration->createMigrations($this->lastTimeStamp);
 
+        $this->createMigrationFilesCache = array_merge($this->createMigrationFilesCache, $this->migration->getCreatedMigrationFiles());
+
         $this->runMigrations();
 
         if(!$this->onlyMigration && $tableCreated)
@@ -549,8 +589,6 @@ class Scaffold implements ScaffoldInterface
                 $this->createTests();
 
                 $this->createSeeds();
-
-                $this->fileCreator->createFile($this->getCreatedFilesCache(), serialize($this->createdFilesCache));
             }
         }
     }
@@ -912,6 +950,9 @@ class Scaffold implements ScaffoldInterface
 
         $this->fileCreator->createClass($fileName, $fileContents, array('name' => 'DatabaseSeeder'), array(), array(), "class", false, false);
 
+        $actualSeederContent = \File::get($fileName);
+        $this->createdFilesCache[md5($actualSeederContent)] = $fileName;
+
         $tableSeederClassName = $this->model->upperPlural() . 'TableSeeder';
 
         $content = \File::get($databaseSeeder);
@@ -930,7 +971,9 @@ class Scaffold implements ScaffoldInterface
      */
     private function createRepositoryInterface()
     {
-        $this->fileCreator->createDirectory($this->configSettings['pathTo']['repositoryInterfaces']);
+        $dir = $this->configSettings['pathTo']['repositoryInterfaces'];
+        $this->fileCreator->createDirectory($dir);
+        $this->createDirCache[] = $dir;
 
         $baseRepository = $this->configSettings['pathTo']['repositoryInterfaces'] . $this->nameOf("baseRepositoryInterface") . ".php";
 
@@ -959,7 +1002,9 @@ class Scaffold implements ScaffoldInterface
      */
     private function createRepository()
     {
-        $this->fileCreator->createDirectory($this->configSettings['pathTo']['repositories']);
+        $dir = $this->configSettings['pathTo']['repositories'];
+        $this->fileCreator->createDirectory($dir);
+        $this->createDirCache[] = $dir;
 
         $fileName = $this->configSettings['pathTo']['repositories'] . $this->nameOf("repository") . '.php';
 
@@ -1047,8 +1092,10 @@ class Scaffold implements ScaffoldInterface
     private function createViews()
     {
         $dir = $this->configSettings['pathTo']['views'] . $this->nameOf('viewFolder') . "/";
-        if (!\File::isDirectory($dir))
+        if (!\File::isDirectory($dir)) {
             \File::makeDirectory($dir);
+            $this->createDirCache[] = $dir;
+        }
 
         $pathToViews = $this->configSettings['pathTo']['templates'].$this->controllerType."/";
 
