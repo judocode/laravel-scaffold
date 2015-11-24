@@ -45,6 +45,8 @@ To include the config file within your config folder.
 
 `scaffold:update` searches for changes in the model definitions file (defined in your config file), and updates your models/migrations accordingly.
 
+`scaffold:reset` removes previously created files except those already modified.
+
 ## Templates
 
 This command utilizes template files, so you can specify the format for your views, controller, repository,
