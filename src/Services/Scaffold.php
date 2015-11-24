@@ -1,6 +1,7 @@
 <?php namespace Binondord\LaravelScaffold\Services;
 
 use Faker\Factory;
+
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\FileNotFoundException;
 
@@ -30,6 +31,11 @@ class Scaffold implements ScaffoldInterface
      * @var array
      */
     private $laravelClasses = array();
+
+    /**
+     * @var array (md5hash => filename)
+     */
+    private $createdFilesCache = array();
 
     /**
      * @var Model
@@ -445,6 +451,66 @@ class Scaffold implements ScaffoldInterface
         return $modelDefinitionsFile;
     }
 
+    private function getCreatedFilesCache()
+    {
+        $cacheModel = $this->getModelCacheFile();
+        return str_replace('models','created-files',$cacheModel);
+    }
+
+    private function removeCreatedFiles()
+    {
+        $remainingFiles = array();
+
+        if(\File::exists($this->getCreatedFilesCache()))
+        {
+            $createdFiles = \File::get($this->getCreatedFilesCache());
+            $createdFilesArray = unserialize($createdFiles);
+            foreach($createdFilesArray as $key=>$createdFile)
+            {
+                if(\File::exists($createdFile))
+                {
+                    $content = \File::get($createdFile);
+                    if(md5($content) == $key)
+                    {
+                        \File::delete($createdFile);
+                    }else{
+                        $remainingFiles[$key] = $createdFile;
+                    }
+                }
+            }
+
+            if(!empty($remainingFiles))
+            {
+                $this->info('List of modified files preserved. (You may want to retain or remove them manually.)');
+                $i=0;
+                foreach($remainingFiles as $remainingFile)
+                {
+                    $this->info(++$i.'.) '.$remainingFile);
+                }
+            }
+
+            return true;
+        }else{
+            $this->info('Nothing to remove.');
+
+            return false;
+        }
+    }
+
+    public function reset()
+    {
+        if($this->removeCreatedFiles())
+        {
+            $this->info('Finishing...');
+
+            $this->command->call('clear-compiled');
+
+            $this->command->call('optimize');
+        };
+
+        $this->info('Done!');
+    }
+
     /**
      *  Creates all of the files
      */
@@ -483,6 +549,8 @@ class Scaffold implements ScaffoldInterface
                 $this->createTests();
 
                 $this->createSeeds();
+
+                $this->fileCreator->createFile($this->getCreatedFilesCache(), serialize($this->createdFilesCache));
             }
         }
     }
@@ -877,7 +945,7 @@ class Scaffold implements ScaffoldInterface
             $repoTemplate .= "-with-base";
         }
 
-        $repoTemplate .= ".txt";
+        $repoTemplate .= ".php";
 
         $fileName = $this->configSettings['pathTo']['repositoryInterfaces'] . $this->nameOf("repositoryInterface") . ".php";
 
@@ -1006,7 +1074,13 @@ class Scaffold implements ScaffoldInterface
                 if(in_array($view, array_keys($transferMap)))
                 {
                     $this->fileCreator->createDirectory($transferMap[$view]);
-                    $this->fileCreator->copyFile($fileName, $transferMap[$view].'/'.$fileName);
+                    $ngCtrlscript = $transferMap[$view].'/'.$this->nameOf('viewFolder').'Ctrl.js';
+                    $this->fileCreator->copyFile($fileName, $ngCtrlscript);
+                    $key = array_search($fileName, $this->createdFilesCache);
+                    if($key !== false && array_key_exists($key, $this->createdFilesCache)) {
+                        \File::delete($fileName);
+                        $this->createdFilesCache[$key] = $ngCtrlscript;
+                    }
                 }
             }
         }
@@ -1045,6 +1119,7 @@ class Scaffold implements ScaffoldInterface
         if(!$this->configSettings['useRepository'])
             $fileContents = str_replace($this->nameOf("repositoryInterface"), $this->nameOf("modelName"), $fileContents);
 
+        $this->createdFilesCache[md5($fileContents)] = $fileName;
         $this->fileCreator->createFile($fileName, $fileContents);
     }
 

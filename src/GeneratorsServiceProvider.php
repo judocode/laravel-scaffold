@@ -104,6 +104,7 @@ class GeneratorsServiceProvider extends ServiceProvider {
             /*'model',*/
             'update',
             'file',
+            'reset'
         ];
 
         foreach($commands as $command)
