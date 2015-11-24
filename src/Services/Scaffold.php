@@ -520,7 +520,7 @@ class Scaffold implements ScaffoldInterface
 
         $fileContents = $this->addRelationships($fileContents);
 
-        $template = $this->configSettings['useRepository'] ? "model.txt" : "model-no-repo.txt";
+        $template = $this->configSettings['useRepository'] ? "model.php" : "model-no-repo.php";
 
         $this->makeFileFromTemplate($fileName, $this->configSettings['pathTo']['templates'].$template, $fileContents);
 
@@ -873,7 +873,7 @@ class Scaffold implements ScaffoldInterface
         if($useBaseRepository)
         {
             if(!file_exists($baseRepository))
-                $this->makeFileFromTemplate($baseRepository, $this->configSettings['pathTo']['templates']."base-repository-interface.txt");
+                $this->makeFileFromTemplate($baseRepository, $this->configSettings['pathTo']['templates']."base-repository-interface.php");
             $repoTemplate .= "-with-base";
         }
 
@@ -895,7 +895,7 @@ class Scaffold implements ScaffoldInterface
 
         $fileName = $this->configSettings['pathTo']['repositories'] . $this->nameOf("repository") . '.php';
 
-        $this->makeFileFromTemplate($fileName, $this->configSettings['pathTo']['templates']."eloquent-repository.txt");
+        $this->makeFileFromTemplate($fileName, $this->configSettings['pathTo']['templates']."eloquent-repository.php");
     }
 
     /**
@@ -997,7 +997,7 @@ class Scaffold implements ScaffoldInterface
             }
             catch(FileNotFoundException $e)
             {
-                $this->command->error("Template file ".$pathToViews . $view.".blade.txt does not exist! You need to create it to generate that file!");
+                $this->command->error("Template file ".$pathToViews . $view.".blade.php does not exist! You need to create it to generate that file!");
             }
 
             if($success)
